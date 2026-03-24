@@ -30,6 +30,12 @@ namespace Rover.Core.Tools.InputInjection
 #endif
         [JsonProperty("device")]
         public string Device { get; set; } = "touch";
+
+        #if !WINDOWS_UWP
+        [JsonPropertyName("dryRun")]
+#endif
+        [JsonProperty("dryRun")]
+        public bool DryRun { get; set; } = false;
     }
 }
 

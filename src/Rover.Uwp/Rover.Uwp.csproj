@@ -125,6 +125,7 @@
     <Compile Include="AppService\RoverToolInvocationService.cs" />
     <Compile Include="AppService\ToolRegistry.cs" />
     <Compile Include="Capabilities\InputInjectionCapability.cs" />
+    <Compile Include="Capabilities\ScreenshotAnnotator.cs" />
     <Compile Include="Capabilities\ScreenshotCapability.cs" />
     <Compile Include="Coordinates\UwpCoordinateResolver.cs" />
     <Compile Include="DebugHost.cs" />

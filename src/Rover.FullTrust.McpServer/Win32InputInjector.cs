@@ -24,6 +24,9 @@ internal sealed class Win32InputInjector
     private static extern IntPtr FindWindow(string? lpClassName, string? lpWindowName);
 
     [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
     private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
     [DllImport("user32.dll")]
@@ -68,6 +71,20 @@ internal sealed class Win32InputInjector
     public Win32InputInjector(string windowTitle = "Rover Sample")
     {
         _windowTitle = windowTitle;
+    }
+
+    /// <summary>
+    /// Brings the target UWP window to the foreground via SetForegroundWindow.
+    /// Returns true if the window was found and the call succeeded.
+    /// </summary>
+    public bool BringToForeground()
+    {
+        IntPtr hwnd = FindWindow("ApplicationFrameWindow", _windowTitle);
+        if (hwnd == IntPtr.Zero)
+            hwnd = FindWindow(null, _windowTitle);
+        if (hwnd == IntPtr.Zero)
+            return false;
+        return SetForegroundWindow(hwnd);
     }
 
     /// <summary>

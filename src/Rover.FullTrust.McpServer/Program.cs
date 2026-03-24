@@ -49,10 +49,44 @@ class Program
 
             if (capturedName == "inject_tap")
             {
-                // Handle tap directly in FullTrust via Win32 SendInput.
-                // Falls back to UWP automation if SendInput fails (e.g., window not found).
+                // Prefer UWP InputInjector (runs in the UWP process via AppService).
+                // Falls back to Win32 SendInput if the UWP path fails.
+                // The UWP side captures an annotated preview screenshot before injection.
                 adapter.RegisterTool(tool.Name, tool.Description, tool.InputSchema, async argsJson =>
                 {
+                    var logPath = System.IO.Path.Combine(
+                        Windows.Storage.ApplicationData.Current.LocalFolder.Path,
+                        "fulltrust-inject.log");
+                    void Log(string msg) { try { System.IO.File.AppendAllText(logPath, $"{DateTimeOffset.Now:o} {msg}\n"); } catch { } }
+                    Log("inject_tap called, trying UWP path first");
+                    // Bring UWP window to foreground so injected input hits the right window
+                    var fgResult = win32Input.BringToForeground();
+                    Log($"BringToForeground: {fgResult}");
+                    await Task.Delay(100); // Let foreground switch settle
+
+                    string? previewScreenshotPath = null;
+                    try
+                    {
+                        var uwpResult = await backend.InvokeToolAsync(capturedName, argsJson);
+                        Log($"UWP result: {uwpResult}");
+                        var parsed = Newtonsoft.Json.Linq.JObject.Parse(uwpResult);
+
+                        // Extract preview path — available regardless of injection success
+                        previewScreenshotPath = parsed["previewScreenshotPath"]?.ToString();
+
+                        // If dryRun, always return the UWP result (no injection needed)
+                        if (parsed["dryRun"]?.ToObject<bool>() == true)
+                            return uwpResult;
+
+                        if (parsed["success"]?.ToObject<bool>() == true)
+                            return uwpResult;
+                        Log("UWP returned failure, falling back to Win32");
+                    }
+                    catch (Exception ex)
+                    {
+                        Log($"UWP tap exception: {ex.Message}");
+                    }
+                    // Fallback to Win32 SendInput
                     try
                     {
                         var req = Newtonsoft.Json.JsonConvert.DeserializeObject<Rover.Core.Tools.InputInjection.InjectTapRequest>(argsJson)
@@ -66,25 +100,52 @@ class Program
                                 resolvedCoordinates = new { x = req.X, y = req.Y },
                                 device = "mouse",
                                 method = "win32_sendinput",
+                                previewScreenshotPath,
                                 timestamp = DateTimeOffset.UtcNow.ToString("o")
                             });
                         }
                     }
-                    catch (Exception ex)
+                    catch (Exception ex2)
                     {
-                        Console.Error.WriteLine($"[McpServer] Win32 tap failed, falling back to UWP: {ex.Message}");
+                        Console.Error.WriteLine($"[McpServer] Win32 tap also failed: {ex2.Message}");
                     }
-                    // Fallback to UWP automation
-                    return await backend.InvokeToolAsync(capturedName, argsJson);
+                    return Newtonsoft.Json.JsonConvert.SerializeObject(new { success = false, previewScreenshotPath, error = "Both UWP and Win32 input injection failed" });
                 });
                 continue;
             }
 
             if (capturedName == "inject_drag_path")
             {
-                // Handle drag directly in FullTrust via Win32 SendInput.
+                // Prefer UWP InputInjector, fall back to Win32 SendInput.
+                // The UWP side captures an annotated preview screenshot before injection.
                 adapter.RegisterTool(tool.Name, tool.Description, tool.InputSchema, async argsJson =>
                 {
+                    // Bring UWP window to foreground so injected input hits the right window
+                    win32Input.BringToForeground();
+                    await Task.Delay(100);
+
+                    string? previewScreenshotPath = null;
+                    try
+                    {
+                        var uwpResult = await backend.InvokeToolAsync(capturedName, argsJson);
+                        var parsed = Newtonsoft.Json.Linq.JObject.Parse(uwpResult);
+
+                        // Extract preview path — available regardless of injection success
+                        previewScreenshotPath = parsed["previewScreenshotPath"]?.ToString();
+
+                        // If dryRun, always return the UWP result (no injection needed)
+                        if (parsed["dryRun"]?.ToObject<bool>() == true)
+                            return uwpResult;
+
+                        if (parsed["success"]?.ToObject<bool>() == true)
+                            return uwpResult;
+                        Console.Error.WriteLine($"[McpServer] UWP drag returned failure, falling back to Win32");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine($"[McpServer] UWP drag failed, falling back to Win32: {ex.Message}");
+                    }
+                    // Fallback to Win32 SendInput
                     try
                     {
                         var req = Newtonsoft.Json.JsonConvert.DeserializeObject<Rover.Core.Tools.InputInjection.InjectDragPathRequest>(argsJson)
@@ -108,16 +169,16 @@ class Program
                                 resolvedPath,
                                 device = "mouse",
                                 method = "win32_sendinput",
+                                previewScreenshotPath,
                                 timestamp = DateTimeOffset.UtcNow.ToString("o")
                             });
                         }
                     }
-                    catch (Exception ex)
+                    catch (Exception ex2)
                     {
-                        Console.Error.WriteLine($"[McpServer] Win32 drag failed, falling back to UWP: {ex.Message}");
+                        Console.Error.WriteLine($"[McpServer] Win32 drag also failed: {ex2.Message}");
                     }
-                    // Fallback to UWP automation
-                    return await backend.InvokeToolAsync(capturedName, argsJson);
+                    return Newtonsoft.Json.JsonConvert.SerializeObject(new { success = false, previewScreenshotPath, error = "Both UWP and Win32 drag injection failed" });
                 });
                 continue;
             }

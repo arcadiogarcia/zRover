@@ -1,4 +1,3 @@
-using Windows.Graphics.Display;
 using Windows.UI.ViewManagement;
 using Rover.Core.Coordinates;
 
@@ -21,15 +20,15 @@ namespace Rover.Uwp.Coordinates
 
                 case CoordinateSpace.Normalized:
                 default:
-                    // 0..1 → screen pixels, accounting for the current display bounds
-                    // and raw-pixel DPI scaling.
+                    // 0..1 → DIP screen coordinates.
+                    // VisibleBounds is already in DIPs.
+                    // Callers must convert to the target coordinate space:
+                    //   Touch (InjectedInputPoint): multiply by RawPixelsPerViewPixel → raw screen pixels
+                    //   Mouse (InjectedInputMouseInfo Absolute): map to 0-65535 normalized range
                     var bounds = ApplicationView.GetForCurrentView().VisibleBounds;
-                    var displayInfo = DisplayInformation.GetForCurrentView();
-                    double scaleX = displayInfo.RawPixelsPerViewPixel;
-                    double scaleY = displayInfo.RawPixelsPerViewPixel;
 
-                    double absX = (point.X * bounds.Width  + bounds.X) * scaleX;
-                    double absY = (point.Y * bounds.Height + bounds.Y) * scaleY;
+                    double absX = point.X * bounds.Width  + bounds.X;
+                    double absY = point.Y * bounds.Height + bounds.Y;
                     return new CoordinatePoint(absX, absY);
             }
         }

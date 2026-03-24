@@ -20,6 +20,7 @@
     <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
+    <RuntimeIdentifiers>win10-arm64;win10-arm64-aot;win10-x64;win10-x64-aot;win10-x86;win10-x86-aot</RuntimeIdentifiers>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
     <DebugSymbols>true</DebugSymbols>
@@ -97,6 +98,7 @@
     <PlatformTarget>ARM64</PlatformTarget>
     <UseVSHostingProcess>false</UseVSHostingProcess>
     <ErrorReport>prompt</ErrorReport>
+    <UseDotNetNativeToolchain>false</UseDotNetNativeToolchain>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|ARM64'">
     <OutputPath>bin\ARM64\Release\</OutputPath>
@@ -165,9 +167,12 @@
   </ItemGroup>
 
   <!-- Include the published FullTrust MCP server exe in the AppX package.
-       The server is published as a self-contained single-file, so we only need one exe. -->
+       The server is published as a self-contained single-file, so we only need one exe.
+       Pick win-arm64 when building for ARM64, otherwise win-x64. -->
   <PropertyGroup>
-    <FullTrustPublishDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\Rover.FullTrust.McpServer\bin\$(Configuration)\net8.0-windows10.0.19041.0\win-x64\publish\'))</FullTrustPublishDir>
+    <_FullTrustRid Condition="'$(Platform)' == 'ARM64'">win-arm64</_FullTrustRid>
+    <_FullTrustRid Condition="'$(Platform)' != 'ARM64'">win-x64</_FullTrustRid>
+    <FullTrustPublishDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\Rover.FullTrust.McpServer\bin\$(Configuration)\net8.0-windows10.0.19041.0\$(_FullTrustRid)\publish\'))</FullTrustPublishDir>
   </PropertyGroup>
   <ItemGroup Condition="Exists('$(FullTrustPublishDir)Rover.FullTrust.McpServer.exe')">
     <Content Include="$(FullTrustPublishDir)Rover.FullTrust.McpServer.exe">
