@@ -21,9 +21,8 @@ namespace Rover.Uwp
             _fullTrustLauncher = launcher;
         }
 
-#if DEBUG
         /// <summary>
-        /// Starts the MCP debug host. Call from App.OnLaunched (debug builds only).
+        /// Starts the MCP debug host. Call from App.OnLaunched.
         /// </summary>
         public static async Task StartAsync(DebugHostOptions options)
         {
@@ -67,10 +66,5 @@ namespace Rover.Uwp
             await _runner.StopAsync();
             _runner = null;
         }
-#else
-        public static Task StartAsync(DebugHostOptions options) => Task.CompletedTask;
-        public static Task StartAsync(string appName, int port = 7331, bool requireAuthToken = false, string? authToken = null) => Task.CompletedTask;
-        public static Task StopAsync() => Task.CompletedTask;
-#endif
     }
 }
