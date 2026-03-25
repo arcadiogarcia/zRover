@@ -536,7 +536,8 @@ Set `dryRun: true` on any input tool to get the preview without actually injecti
 ## Requirements & Limitations
 
 - **Developer Mode** must be enabled on the machine for input injection to work.
-- **Input injection** requires the `inputInjectionBrokered` restricted capability. If the Windows `InputInjector` API is unavailable on a given configuration, tap and drag tools fall back to XAML automation (finding UI elements at coordinates and invoking them programmatically). This fallback supports buttons, sliders, and other standard controls but not arbitrary touch gestures.
+- **Input injection** requires the `inputInjectionBrokered` restricted capability. If the Windows `InputInjector` API is unavailable, tap and drag tools fall back to Win32 `SendInput` via the FullTrust companion process. This fallback supports basic mouse clicks and drags but not touch, pen, gamepad, or multi-touch gestures.
+- **Architecture must match the host machine.** The `InputInjector` COM component is native-only — it does not work under emulation. On ARM64 machines, you **must** build and deploy as ARM64. Building as x64 on ARM64 hardware will cause `InputInjector.TryCreate()` to fail with `HRESULT 0x800700C1` ("is not a valid Win32 application"), falling back to Win32 input. See [Troubleshooting](#troubleshooting) for details.
 - The MCP server runs as a **FullTrust companion process** alongside your UWP app. Both processes must be running for tools to work.
 - The server listens on **localhost only** — remote connections require your own tunneling solution.
 - **.NET 8 runtime** must be installed on the target machine (the companion is published as framework-dependent).
@@ -557,6 +558,12 @@ Set `dryRun: true` on any input tool to get the preview without actually injecti
 - Confirm `inputInjectionBrokered` is declared in your manifest.
 - Ensure Developer Mode is enabled (required by `InputInjector`).
 - The app window must be in the foreground — the companion server automatically brings it forward before injection.
+
+**InputInjector fails — `inject_tap` returns `device: "mouse"` instead of `device: "touch"`**
+- This means the UWP `InputInjector` could not initialize and the server fell back to Win32 `SendInput`.
+- **Most common cause:** architecture mismatch. On ARM64 machines, the `InputInjector` COM interface (`IInputInjectorStatics`) is native ARM64 only. If your app is built as x64 and running under emulation, `InputInjector.TryCreate()` throws `InvalidCastException` with `HRESULT 0x800700C1` ("is not a valid Win32 application").
+- **Fix:** Always build and deploy your app as the **native architecture** of the host machine. On ARM64 hardware, build as ARM64 — never use x64 emulation for apps that need input injection.
+- Check the diagnostic log at startup: the MCP server logs `InputInjectionCapability: InputInjector not available` with the specific error when this occurs.
 
 **App crashes on launch**
 - Check the crash log at `%LOCALAPPDATA%\Packages\<PackageFamilyName>\LocalState\crash.log`.
