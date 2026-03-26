@@ -130,6 +130,7 @@
     <Compile Include="Capabilities\InputInjectionCapability.Touch.cs" />
     <Compile Include="Capabilities\InputInjectionCapability.Pen.cs" />
     <Compile Include="Capabilities\InputInjectionCapability.Gamepad.cs" />
+    <Compile Include="Capabilities\AppActionCapability.cs" />
     <Compile Include="Capabilities\ScreenshotAnnotator.cs" />
     <Compile Include="Capabilities\ScreenshotCapability.cs" />
     <Compile Include="Coordinates\UwpCoordinateResolver.cs" />
@@ -164,6 +165,8 @@
     <Compile Include="..\Rover.Core\DebugHostOptions.cs" Link="Linked\Rover.Core\DebugHostOptions.cs" />
     <Compile Include="..\Rover.Core\IDebugCapability.cs" Link="Linked\Rover.Core\IDebugCapability.cs" />
     <Compile Include="..\Rover.Core\IMcpToolRegistry.cs" Link="Linked\Rover.Core\IMcpToolRegistry.cs" />
+    <Compile Include="..\Rover.Core\IActionableApp.cs" Link="Linked\Rover.Core\IActionableApp.cs" />
+    <Compile Include="..\Rover.Core\AppActionMcpHandlers.cs" Link="Linked\Rover.Core\AppActionMcpHandlers.cs" />
     <Compile Include="..\Rover.Core\Coordinates\CoordinatePoint.cs" Link="Linked\Rover.Core\Coordinates\CoordinatePoint.cs" />
     <Compile Include="..\Rover.Core\Coordinates\CoordinateSpace.cs" Link="Linked\Rover.Core\Coordinates\CoordinateSpace.cs" />
     <Compile Include="..\Rover.Core\Coordinates\ICoordinateResolver.cs" Link="Linked\Rover.Core\Coordinates\ICoordinateResolver.cs" />

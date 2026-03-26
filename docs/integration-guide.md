@@ -24,6 +24,7 @@ Add AI-driven UI automation to any UWP app. Rover exposes your app's screen and 
   - [Keyboard Tools](#keyboard-tools)
   - [Pen Input Tools](#pen-input-tools)
   - [Gamepad Tools](#gamepad-tools)
+  - [App Action Tools](#app-action-tools)
 - [Coordinate Spaces](#coordinate-spaces)
 - [Preview & Dry Run](#preview--dry-run)
 - [Requirements & Limitations](#requirements--limitations)
@@ -185,6 +186,7 @@ That's it. Build and run your app — the MCP server will start listening on `ht
 | `appName` | `string` | *(required)* | Display name shown to MCP clients |
 | `port` | `int` | `5100` | TCP port the MCP server listens on |
 | `launchFullTrust` | `Func<Task>?` | `null` | Callback to launch the FullTrust companion. Pass the `FullTrustProcessLauncher` call as shown above. If `null`, no companion server starts (tools register but aren't reachable externally). |
+| `actionableApp` | `IActionableApp?` | `null` | Optional implementation of `Rover.Core.IActionableApp` to expose app-defined actions via the `list_actions` and `dispatch_action` MCP tools. See [App Action Tools](#app-action-tools). |
 
 ## Connecting MCP Clients
 
@@ -274,7 +276,7 @@ var tools = await client.ListToolsAsync();
 
 ## Available Tools
 
-Rover registers **16 tools** organized across screenshot capture, touch/mouse, keyboard, pen, and gamepad input.
+Rover registers **18 tools** organized across screenshot capture, touch/mouse, keyboard, pen, gamepad input, and app-defined action dispatch.
 
 ### Screenshot Tools
 
@@ -505,6 +507,140 @@ Injects a series of gamepad frames in order. After the last frame, all inputs ar
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `frames` | array | *(required)* | Array of frame objects. Each frame accepts the same fields as `inject_gamepad_input` plus `durationMs` (default 100) per frame. |
+
+---
+
+### App Action Tools
+
+App Action tools expose the host application's own discrete operations as MCP tools. Your app opts in by implementing `Rover.Core.IActionableApp` and passing the instance to `RoverMcp.StartAsync`. The two tools are always registered as a pair; if no `IActionableApp` is provided, neither tool appears in `tools/list`.
+
+#### `list_actions`
+
+Returns the set of actions the app currently supports. The list is dynamic — the app may return different actions depending on state (e.g. which objects are selected).
+
+**Parameters:** none
+
+**Returns:**
+```json
+{
+  "actions": [
+    {
+      "name": "SetPresetColor",
+      "description": "Sets the RGB sliders to a named color preset.",
+      "parameterSchema": {
+        "type": "object",
+        "properties": {
+          "color": { "type": "string", "enum": ["Red", "Green", "Blue", "Yellow", "White"] }
+        },
+        "required": ["color"]
+      }
+    }
+  ]
+}
+```
+
+#### `dispatch_action`
+
+Dispatches a named action and returns whether it succeeded.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `action` | string | *(required)* | Name of the action to dispatch (must match a name from `list_actions`) |
+| `params` | object | `{}` | Parameters validated against the action's `parameterSchema` |
+
+**Returns on success:**
+```json
+{ "success": true, "consequences": ["UpdateColorPreview"] }
+```
+
+**Returns on failure:**
+```json
+{ "success": false, "error": { "code": "unknown_action", "message": "No action named 'Foo'" } }
+```
+
+Error codes: `unknown_action`, `validation_error`, `not_available`, `execution_error`.
+
+#### Implementing `IActionableApp`
+
+Add the interface to any class accessible from `App.xaml.cs`, typically your main page:
+
+```csharp
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
+using Rover.Core;
+
+public sealed partial class MainPage : Page, IActionableApp
+{
+    private static readonly IReadOnlyList<ActionDescriptor> _actions = new[]
+    {
+        new ActionDescriptor(
+            name: "SetPresetColor",
+            description: "Sets the RGB sliders to a named color preset.",
+            parameterSchema: @"{
+              ""type"": ""object"",
+              ""properties"": {
+                ""color"": { ""type"": ""string"", ""enum"": [""Red"", ""Green"", ""Blue""] }
+              },
+              ""required"": [""color""]
+            }"),
+    };
+
+    public IReadOnlyList<ActionDescriptor> GetAvailableActions() => _actions;
+
+    public async Task<ActionResult> DispatchAsync(string actionName, string parametersJson)
+    {
+        switch (actionName)
+        {
+            case "SetPresetColor":
+                return await DispatchSetPresetColorAsync(parametersJson);
+            default:
+                return ActionResult.Fail("unknown_action", $"No action named '{actionName}'");
+        }
+    }
+
+    private async Task<ActionResult> DispatchSetPresetColorAsync(string parametersJson)
+    {
+        JObject p;
+        try { p = JObject.Parse(parametersJson); }
+        catch { return ActionResult.Fail("validation_error", "params is not valid JSON"); }
+
+        var color = p["color"]?.Value<string>();
+        if (string.IsNullOrEmpty(color))
+            return ActionResult.Fail("validation_error", "Missing required parameter: color");
+
+        // Marshal UI work to the dispatcher thread.
+        await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
+        {
+            switch (color)
+            {
+                case "Red":   RedSlider.Value = 255; GreenSlider.Value = 0;   BlueSlider.Value = 0;   break;
+                case "Green": RedSlider.Value = 0;   GreenSlider.Value = 255; BlueSlider.Value = 0;   break;
+                case "Blue":  RedSlider.Value = 0;   GreenSlider.Value = 0;   BlueSlider.Value = 255; break;
+            }
+        });
+
+        return ActionResult.Ok(new[] { "UpdateColorPreview" });
+    }
+}
+```
+
+Pass the instance to `RoverMcp.StartAsync` in `App.xaml.cs`:
+
+```csharp
+protected override async void OnLaunched(LaunchActivatedEventArgs e)
+{
+    // ... navigation setup, Window.Current.Activate() ...
+
+    var actionableApp = rootFrame.Content as Rover.Core.IActionableApp;
+    await Rover.Uwp.RoverMcp.StartAsync("MyApp", port: 5100,
+        launchFullTrust: () => FullTrustProcessLauncher
+            .LaunchFullTrustProcessForCurrentAppAsync("McpServer").AsTask(),
+        actionableApp: actionableApp);
+}
+```
+
+> **Thread safety:** `GetAvailableActions()` is called from the AppService IPC thread (background). `DispatchAsync` receives the call on a background thread — marshal any UI work to `Dispatcher.RunAsync` as shown above.
 
 ---
 

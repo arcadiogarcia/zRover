@@ -1,4 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
+using Rover.Core;
 using Windows.UI;
 using Windows.UI.Input.Inking;
 using Windows.UI.Xaml;
@@ -6,7 +10,7 @@ using Windows.UI.Xaml.Controls;
 
 namespace Rover.Uwp.Sample
 {
-    public sealed partial class MainPage : Page
+    public sealed partial class MainPage : Page, IActionableApp
     {
         public MainPage()
         {
@@ -164,5 +168,144 @@ namespace Rover.Uwp.Sample
         }
 
         #endregion
+
+        // ═══════════════════════════════════════════════════════════════
+        //  IActionableApp — App Action API
+        // ═══════════════════════════════════════════════════════════════
+
+        private static readonly IReadOnlyList<ActionDescriptor> _actions = new[]
+        {
+            new ActionDescriptor(
+                name: "SetPresetColor",
+                description: "Sets the color picker to one of the five preset colors by name, " +
+                             "updating the R, G, and B sliders and the preview rectangle.",
+                parameterSchema: @"{
+  ""type"": ""object"",
+  ""required"": [""color""],
+  ""properties"": {
+    ""color"": {
+      ""type"": ""string"",
+      ""description"": ""The preset color name to apply."",
+      ""enum"": [""Red"", ""Green"", ""Blue"", ""Yellow"", ""White""]
+    }
+  }
+}"),
+            new ActionDescriptor(
+                name: "SetColorChannel",
+                description: "Sets a single RGB color channel to the given value (0–255), " +
+                             "updating the corresponding slider and the preview rectangle.",
+                parameterSchema: @"{
+  ""type"": ""object"",
+  ""required"": [""channel"", ""value""],
+  ""properties"": {
+    ""channel"": {
+      ""type"": ""string"",
+      ""description"": ""Which color channel to set: R (red), G (green), or B (blue)."",
+      ""enum"": [""R"", ""G"", ""B""]
+    },
+    ""value"": {
+      ""type"": ""integer"",
+      ""description"": ""The channel intensity, from 0 (off) to 255 (full)."",
+      ""minimum"": 0,
+      ""maximum"": 255
+    }
+  }
+}"),
+        };
+
+        public IReadOnlyList<ActionDescriptor> GetAvailableActions() => _actions;
+
+        public async Task<ActionResult> DispatchAsync(string actionName, string parametersJson)
+        {
+            try
+            {
+                switch (actionName)
+                {
+                    case "SetPresetColor":
+                        return await DispatchSetPresetColorAsync(parametersJson);
+                    case "SetColorChannel":
+                        return await DispatchSetColorChannelAsync(parametersJson);
+                    default:
+                        return ActionResult.Fail("unknown_action", $"No action named '{actionName}' is registered.");
+                }
+            }
+            catch (Exception ex)
+            {
+                return ActionResult.Fail("execution_error", ex.Message);
+            }
+        }
+
+        private Task<ActionResult> DispatchSetPresetColorAsync(string parametersJson)
+        {
+            JObject p;
+            try { p = JObject.Parse(parametersJson); }
+            catch { return Task.FromResult(ActionResult.Fail("validation_error", "params is not valid JSON.")); }
+
+            var colorName = p["color"]?.Value<string>();
+            byte r, g, b;
+            switch (colorName)
+            {
+                case "Red":    r = 255; g =   0; b =   0; break;
+                case "Green":  r =   0; g = 255; b =   0; break;
+                case "Blue":   r =   0; g =   0; b = 255; break;
+                case "Yellow": r = 255; g = 255; b =   0; break;
+                case "White":  r = 255; g = 255; b = 255; break;
+                default:
+                    return Task.FromResult(ActionResult.Fail("validation_error",
+                        $"params.color: '{colorName}' is not in the valid set [Red, Green, Blue, Yellow, White]"));
+            }
+
+            var tcs = new TaskCompletionSource<ActionResult>();
+            var _ = Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
+            {
+                try
+                {
+                    RedSlider.Value = r;
+                    GreenSlider.Value = g;
+                    BlueSlider.Value = b;
+                    tcs.TrySetResult(ActionResult.Ok(new[] { "UpdateColorPreview" }));
+                }
+                catch (Exception ex) { tcs.TrySetResult(ActionResult.Fail("execution_error", ex.Message)); }
+            });
+            return tcs.Task;
+        }
+
+        private Task<ActionResult> DispatchSetColorChannelAsync(string parametersJson)
+        {
+            JObject p;
+            try { p = JObject.Parse(parametersJson); }
+            catch { return Task.FromResult(ActionResult.Fail("validation_error", "params is not valid JSON.")); }
+
+            var channel = p["channel"]?.Value<string>();
+            var valueToken = p["value"];
+            if (valueToken == null)
+                return Task.FromResult(ActionResult.Fail("validation_error", "params.value is required."));
+
+            int value = valueToken.Value<int>();
+            if (value < 0 || value > 255)
+                return Task.FromResult(ActionResult.Fail("validation_error",
+                    $"params.value: {value} is out of range [0, 255]"));
+
+            if (channel != "R" && channel != "G" && channel != "B")
+                return Task.FromResult(ActionResult.Fail("validation_error",
+                    $"params.channel: '{channel}' is not in the valid set [R, G, B]"));
+
+            var tcs = new TaskCompletionSource<ActionResult>();
+            var _ = Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
+            {
+                try
+                {
+                    switch (channel)
+                    {
+                        case "R": RedSlider.Value   = value; break;
+                        case "G": GreenSlider.Value = value; break;
+                        case "B": BlueSlider.Value  = value; break;
+                    }
+                    tcs.TrySetResult(ActionResult.Ok(new[] { "UpdateColorPreview" }));
+                }
+                catch (Exception ex) { tcs.TrySetResult(ActionResult.Fail("execution_error", ex.Message)); }
+            });
+            return tcs.Task;
+        }
     }
 }

@@ -42,14 +42,18 @@ namespace Rover.Uwp
         /// Callback that launches the FullTrust companion process.
         /// Typically: <c>() => FullTrustProcessLauncher.LaunchFullTrustProcessForCurrentAppAsync("McpServer").AsTask()</c>
         /// </param>
-        public static async Task StartAsync(string appName, int port = 5100, Func<Task>? launchFullTrust = null)
+        public static async Task StartAsync(
+            string appName,
+            int port = 5100,
+            Func<Task>? launchFullTrust = null,
+            Rover.Core.IActionableApp? actionableApp = null)
         {
             // Wire window-close signal so FullTrust process shuts down
             if (Window.Current != null)
                 Window.Current.Closed += (s, a) => RoverAppService.WindowClosed = true;
 
             // Register capabilities + tools
-            await DebugHost.StartAsync(appName, port: port);
+            await DebugHost.StartAsync(appName, port: port, actionableApp: actionableApp);
 
             // Launch the FullTrust MCP companion process
             if (launchFullTrust != null)

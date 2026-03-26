@@ -59,6 +59,9 @@ BundleArtifacts/
 **/Deploy/
 **/FullTrust/
 
+## Manual loose-layout staging directory (created during dev, not part of source)
+deploy_uwp/
+
 ## Test Results
 [Tt]est[Rr]esult*/
 [Bb]uild[Ll]og.*

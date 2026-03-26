@@ -46,7 +46,8 @@ namespace Rover.Uwp
             string appName,
             int port = 7331,
             bool requireAuthToken = false,
-            string? authToken = null)
+            string? authToken = null,
+            Rover.Core.IActionableApp? actionableApp = null)
         {
             return StartAsync(new DebugHostOptions
             {
@@ -55,7 +56,8 @@ namespace Rover.Uwp
                 EnableInputInjection = true,
                 EnableScreenshots = true,
                 RequireAuthToken = requireAuthToken,
-                AuthToken = authToken
+                AuthToken = authToken,
+                ActionableApp = actionableApp
             });
         }
 

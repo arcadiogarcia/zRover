@@ -222,4 +222,152 @@ public class EndToEndPipelineTests : IAsyncLifetime
 
         caught.Should().NotBeNull("MCP server should reject calls to nonexistent tools");
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  App Action API — list_actions / dispatch_action
+    // ═══════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task ListTools_IncludesAppActionTools()
+    {
+        var tools = await _client.ListToolsAsync();
+        var names = tools.Select(t => t.Name).ToList();
+
+        names.Should().Contain("list_actions",
+            "UWP sample registers IActionableApp so list_actions should be exposed");
+        names.Should().Contain("dispatch_action",
+            "UWP sample registers IActionableApp so dispatch_action should be exposed");
+    }
+
+    [Fact]
+    public async Task ListActions_ReturnsActionsArray()
+    {
+        var result = await _client.CallToolAsync(
+            "list_actions",
+            new Dictionary<string, object?>());
+
+        result.IsError.Should().NotBe(true, "list_actions should always succeed");
+        result.Content.Should().NotBeEmpty();
+
+        var text = (result.Content[0] as ModelContextProtocol.Protocol.TextContentBlock)!.Text;
+        var doc = JsonDocument.Parse(text);
+
+        doc.RootElement.TryGetProperty("actions", out var actions).Should().BeTrue("response must have an 'actions' key");
+        actions.ValueKind.Should().Be(JsonValueKind.Array);
+    }
+
+    [Fact]
+    public async Task ListActions_SampleApp_ExposesExpectedActions()
+    {
+        var result = await _client.CallToolAsync(
+            "list_actions",
+            new Dictionary<string, object?>());
+
+        var text = (result.Content[0] as ModelContextProtocol.Protocol.TextContentBlock)!.Text;
+        var doc = JsonDocument.Parse(text);
+        var names = doc.RootElement.GetProperty("actions")
+            .EnumerateArray()
+            .Select(a => a.GetProperty("name").GetString())
+            .ToList();
+
+        names.Should().Contain("SetPresetColor", "sample app registers SetPresetColor");
+        names.Should().Contain("SetColorChannel", "sample app registers SetColorChannel");
+    }
+
+    [Fact]
+    public async Task ListActions_ActionDescriptors_HaveParameterSchema()
+    {
+        var result = await _client.CallToolAsync(
+            "list_actions",
+            new Dictionary<string, object?>());
+
+        var text = (result.Content[0] as ModelContextProtocol.Protocol.TextContentBlock)!.Text;
+        var doc = JsonDocument.Parse(text);
+
+        foreach (var action in doc.RootElement.GetProperty("actions").EnumerateArray())
+        {
+            action.TryGetProperty("parameterSchema", out var schema).Should().BeTrue(
+                $"action '{action.GetProperty("name").GetString()}' must have a parameterSchema");
+            schema.GetProperty("type").GetString().Should().Be("object");
+        }
+    }
+
+    [Fact]
+    public async Task DispatchAction_SetPresetColor_Succeeds()
+    {
+        var result = await _client.CallToolAsync(
+            "dispatch_action",
+            new Dictionary<string, object?>
+            {
+                { "action", "SetPresetColor" },
+                { "params", new Dictionary<string, object?> { { "color", "Blue" } } }
+            });
+
+        result.IsError.Should().NotBe(true, "dispatch_action should not be a tool-level error");
+
+        var text = (result.Content[0] as ModelContextProtocol.Protocol.TextContentBlock)!.Text;
+        var doc = JsonDocument.Parse(text);
+        doc.RootElement.GetProperty("success").GetBoolean().Should().BeTrue(
+            "SetPresetColor with a valid color should succeed");
+    }
+
+    [Fact]
+    public async Task DispatchAction_SetColorChannel_Succeeds()
+    {
+        var result = await _client.CallToolAsync(
+            "dispatch_action",
+            new Dictionary<string, object?>
+            {
+                { "action", "SetColorChannel" },
+                { "params", new Dictionary<string, object?> { { "channel", "R" }, { "value", 128 } } }
+            });
+
+        result.IsError.Should().NotBe(true);
+
+        var text = (result.Content[0] as ModelContextProtocol.Protocol.TextContentBlock)!.Text;
+        var doc = JsonDocument.Parse(text);
+        doc.RootElement.GetProperty("success").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task DispatchAction_UnknownAction_ReturnsUnknownActionError()
+    {
+        var result = await _client.CallToolAsync(
+            "dispatch_action",
+            new Dictionary<string, object?>
+            {
+                { "action", "ActionThatDoesNotExist_XYZ" },
+                { "params", new Dictionary<string, object?>() }
+            });
+
+        // dispatch_action itself succeeds as an MCP tool — the domain failure is in the payload
+        result.IsError.Should().NotBe(true, "MCP-level call should succeed; failure is in the JSON payload");
+
+        var text = (result.Content[0] as ModelContextProtocol.Protocol.TextContentBlock)!.Text;
+        var doc = JsonDocument.Parse(text);
+        doc.RootElement.GetProperty("success").GetBoolean().Should().BeFalse();
+        doc.RootElement.GetProperty("error").GetProperty("code").GetString()
+            .Should().Be("unknown_action");
+    }
+
+    [Fact]
+    public async Task DispatchAction_InvalidParamValue_ReturnsValidationError()
+    {
+        var result = await _client.CallToolAsync(
+            "dispatch_action",
+            new Dictionary<string, object?>
+            {
+                { "action", "SetPresetColor" },
+                { "params", new Dictionary<string, object?> { { "color", "Magenta" } } }
+            });
+
+        result.IsError.Should().NotBe(true);
+
+        var text = (result.Content[0] as ModelContextProtocol.Protocol.TextContentBlock)!.Text;
+        var doc = JsonDocument.Parse(text);
+        doc.RootElement.GetProperty("success").GetBoolean().Should().BeFalse();
+        doc.RootElement.GetProperty("error").GetProperty("code").GetString()
+            .Should().Be("validation_error");
+    }
 }
+

@@ -57,6 +57,8 @@ namespace Rover.Uwp
                 _capabilities.Add(new InputInjectionCapability());
             if (_options.EnableScreenshots)
                 _capabilities.Add(new ScreenshotCapability());
+            if (_options.ActionableApp != null)
+                _capabilities.Add(new AppActionCapability(_options.ActionableApp));
 
             // Start capabilities
             foreach (var capability in _capabilities)

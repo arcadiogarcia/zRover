@@ -50,8 +50,10 @@ namespace Rover.Uwp.Sample
 #if DEBUG
             try
             {
+                var actionableApp = rootFrame.Content as Rover.Core.IActionableApp;
                 await Rover.Uwp.RoverMcp.StartAsync("Rover.Uwp.Sample", port: 5100,
-                    () => FullTrustProcessLauncher.LaunchFullTrustProcessForCurrentAppAsync("McpServer").AsTask());
+                    launchFullTrust: () => FullTrustProcessLauncher.LaunchFullTrustProcessForCurrentAppAsync("McpServer").AsTask(),
+                    actionableApp: actionableApp);
             }
             catch (Exception ex)
             {
