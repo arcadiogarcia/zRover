@@ -191,6 +191,21 @@ namespace Rover.Uwp.Sample
   }
 }"),
             new ActionDescriptor(
+                name: "SwitchTab",
+                description: "Switches the visible tab in the main Pivot. " +
+                             "Use this to navigate between the Color Picker, Text Input, Ink Canvas, and Scroll Test tabs.",
+                parameterSchema: @"{
+  ""type"": ""object"",
+  ""required"": [""tab""],
+  ""properties"": {
+    ""tab"": {
+      ""type"": ""string"",
+      ""description"": ""The tab to switch to."",
+      ""enum"": [""Color Picker"", ""Text Input"", ""Ink Canvas"", ""Scroll Test""]
+    }
+  }
+}"),
+            new ActionDescriptor(
                 name: "SetColorChannel",
                 description: "Sets a single RGB color channel to the given value (0–255), " +
                              "updating the corresponding slider and the preview rectangle.",
@@ -225,6 +240,8 @@ namespace Rover.Uwp.Sample
                         return await DispatchSetPresetColorAsync(parametersJson);
                     case "SetColorChannel":
                         return await DispatchSetColorChannelAsync(parametersJson);
+                    case "SwitchTab":
+                        return await DispatchSwitchTabAsync(parametersJson);
                     default:
                         return ActionResult.Fail("unknown_action", $"No action named '{actionName}' is registered.");
                 }
@@ -302,6 +319,38 @@ namespace Rover.Uwp.Sample
                         case "B": BlueSlider.Value  = value; break;
                     }
                     tcs.TrySetResult(ActionResult.Ok(new[] { "UpdateColorPreview" }));
+                }
+                catch (Exception ex) { tcs.TrySetResult(ActionResult.Fail("execution_error", ex.Message)); }
+            });
+            return tcs.Task;
+        }
+
+        private Task<ActionResult> DispatchSwitchTabAsync(string parametersJson)
+        {
+            JObject p;
+            try { p = JObject.Parse(parametersJson); }
+            catch { return Task.FromResult(ActionResult.Fail("validation_error", "params is not valid JSON.")); }
+
+            var tab = p["tab"]?.Value<string>();
+            int index;
+            switch (tab)
+            {
+                case "Color Picker": index = 0; break;
+                case "Text Input":   index = 1; break;
+                case "Ink Canvas":   index = 2; break;
+                case "Scroll Test":  index = 3; break;
+                default:
+                    return Task.FromResult(ActionResult.Fail("validation_error",
+                        $"params.tab: '{tab}' is not in the valid set [Color Picker, Text Input, Ink Canvas, Scroll Test]"));
+            }
+
+            var tcs = new TaskCompletionSource<ActionResult>();
+            var _ = Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
+            {
+                try
+                {
+                    ((Windows.UI.Xaml.Controls.Pivot)Content).SelectedIndex = index;
+                    tcs.TrySetResult(ActionResult.Ok(new[] { "TabChanged" }));
                 }
                 catch (Exception ex) { tcs.TrySetResult(ActionResult.Fail("execution_error", ex.Message)); }
             });

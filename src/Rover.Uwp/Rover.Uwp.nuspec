@@ -2,10 +2,12 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
   <metadata>
     <id>Rover.Uwp</id>
-    <version>0.3.0-preview</version>
+    <version>0.5.0-preview</version>
     <title>Rover - MCP Tools for UWP Apps</title>
     <authors>Rover Contributors</authors>
-    <description>Add Model Context Protocol (MCP) tool endpoints to any UWP app. Rover exposes input injection, screenshot capture, and coordinate validation tools through a FullTrust companion MCP server, letting AI agents interact with your app's UI.
+    <description>Add Model Context Protocol (MCP) tool endpoints to any UWP app. Rover exposes input injection, screenshot capture, coordinate validation, and app-defined action dispatch tools through a FullTrust companion MCP server, letting AI agents interact with your app's UI.
+
+New in 0.5.0: App Action API — implement IActionableApp to expose your own app's operations as list_actions / dispatch_action MCP tools.
 
 Minimal integration: three lines in App.xaml.cs.</description>
     <readme>docs\README.md</readme>
