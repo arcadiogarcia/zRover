@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Rover.Core.Logging;
 using Windows.ApplicationModel.Activation;
 using Windows.ApplicationModel.Background;
 using Windows.UI.Xaml;
@@ -77,5 +78,22 @@ namespace Rover.Uwp
         {
             DebugHost.StopAsync().GetAwaiter().GetResult();
         }
+
+        // ---------------------------------------------------------------
+        // Logging shorthands — host app code can call these directly
+        // without importing Rover.Core.Logging.
+        // ---------------------------------------------------------------
+
+        /// <summary>Writes a diagnostic info message to the Rover log (visible via <c>get_logs</c>).</summary>
+        public static void Log(string category, string message)
+            => RoverLog.Info(category, message);
+
+        /// <summary>Writes a warning to the Rover log.</summary>
+        public static void LogWarn(string category, string message, Exception? exception = null)
+            => RoverLog.Warn(category, message, exception);
+
+        /// <summary>Writes an error to the Rover log.</summary>
+        public static void LogError(string category, string message, Exception? exception = null)
+            => RoverLog.Error(category, message, exception);
     }
 }

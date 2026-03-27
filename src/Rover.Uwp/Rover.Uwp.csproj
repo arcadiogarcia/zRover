@@ -131,6 +131,7 @@
     <Compile Include="Capabilities\InputInjectionCapability.Pen.cs" />
     <Compile Include="Capabilities\InputInjectionCapability.Gamepad.cs" />
     <Compile Include="Capabilities\AppActionCapability.cs" />
+    <Compile Include="Capabilities\LoggingCapability.cs" />
     <Compile Include="Capabilities\ScreenshotAnnotator.cs" />
     <Compile Include="Capabilities\ScreenshotCapability.cs" />
     <Compile Include="Coordinates\UwpCoordinateResolver.cs" />
@@ -204,6 +205,10 @@
     <Compile Include="..\Rover.Core\Tools\Screenshot\CaptureRegionResponse.cs" Link="Linked\Rover.Core\Tools\CaptureRegionResponse.cs" />
     <Compile Include="..\Rover.Core\Tools\Screenshot\ValidatePositionRequest.cs" Link="Linked\Rover.Core\Tools\ValidatePositionRequest.cs" />
     <Compile Include="..\Rover.Core\Tools\Screenshot\ValidatePositionResponse.cs" Link="Linked\Rover.Core\Tools\ValidatePositionResponse.cs" />
+    <Compile Include="..\Rover.Core\Logging\LogEntry.cs" Link="Linked\Rover.Core\Logging\LogEntry.cs" />
+    <Compile Include="..\Rover.Core\Logging\IInMemoryLogStore.cs" Link="Linked\Rover.Core\Logging\IInMemoryLogStore.cs" />
+    <Compile Include="..\Rover.Core\Logging\InMemoryLogStore.cs" Link="Linked\Rover.Core\Logging\InMemoryLogStore.cs" />
+    <Compile Include="..\Rover.Core\Logging\RoverLog.cs" Link="Linked\Rover.Core\Logging\RoverLog.cs" />
   </ItemGroup>
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '14.0' ">
     <VisualStudioVersion>14.0</VisualStudioVersion>
