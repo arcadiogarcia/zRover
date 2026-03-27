@@ -54,21 +54,14 @@ class Program
                 // The UWP side captures an annotated preview screenshot before injection.
                 adapter.RegisterTool(tool.Name, tool.Description, tool.InputSchema, async argsJson =>
                 {
-                    var logPath = System.IO.Path.Combine(
-                        Windows.Storage.ApplicationData.Current.LocalFolder.Path,
-                        "fulltrust-inject.log");
-                    void Log(string msg) { try { System.IO.File.AppendAllText(logPath, $"{DateTimeOffset.Now:o} {msg}\n"); } catch { } }
-                    Log("inject_tap called, trying UWP path first");
                     // Bring UWP window to foreground so injected input hits the right window
-                    var fgResult = win32Input.BringToForeground();
-                    Log($"BringToForeground: {fgResult}");
+                    win32Input.BringToForeground();
                     await Task.Delay(100); // Let foreground switch settle
 
                     string? previewScreenshotPath = null;
                     try
                     {
                         var uwpResult = await backend.InvokeToolAsync(capturedName, argsJson);
-                        Log($"UWP result: {uwpResult}");
                         var parsed = Newtonsoft.Json.Linq.JObject.Parse(uwpResult);
 
                         // Extract preview path — available regardless of injection success
@@ -80,11 +73,11 @@ class Program
 
                         if (parsed["success"]?.ToObject<bool>() == true)
                             return uwpResult;
-                        Log("UWP returned failure, falling back to Win32");
+                        Console.Error.WriteLine($"[McpServer] UWP tap returned failure, falling back to Win32");
                     }
                     catch (Exception ex)
                     {
-                        Log($"UWP tap exception: {ex.Message}");
+                        Console.Error.WriteLine($"[McpServer] UWP tap failed, falling back to Win32: {ex.Message}");
                     }
                     // Fallback to Win32 SendInput
                     try
@@ -209,7 +202,7 @@ class Program
         else
         {
             Console.Error.WriteLine($"[McpServer] Running HTTP server on port {port}");
-            await McpServerRunner.RunHttpAsync(adapter, port, backend.ShutdownToken);
+            await McpServerRunner.RunHttpAsync(adapter, port, backend.ShutdownToken, backend.LogPath);
         }
 
         Console.Error.WriteLine("[McpServer] MCP server shutting down");
@@ -250,14 +243,16 @@ internal static class McpServerRunner
     public static async Task RunHttpAsync(
         McpToolRegistryAdapter adapter,
         int port,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string logPath = "")
     {
         var builder = WebApplication.CreateBuilder(new string[] { "--urls", $"http://localhost:{port}" });
 
-        // Register our pre-discovered tools as singleton services
+        // Register pre-discovered tools as McpServerTool singletons so the HTTP
+        // transport can resolve them from DI via IEnumerable<McpServerTool>.
         foreach (var tool in adapter.Tools)
         {
-            builder.Services.AddSingleton(tool);
+            builder.Services.AddSingleton<ModelContextProtocol.Server.McpServerTool>(tool);
         }
 
         builder.Services.AddMcpServer(options =>
@@ -267,9 +262,37 @@ internal static class McpServerRunner
             {
                 Tools = new ToolsCapability { ListChanged = true }
             };
+            // Supply the tool collection directly so both stdio and HTTP paths
+            // share the same tool source.
+            options.ToolCollection = adapter.Tools;
         }).WithHttpTransport();
 
         var app = builder.Build();
+
+        // Capture any unhandled exceptions and write them to the log for diagnostics.
+        app.Use(async (ctx, next) =>
+        {
+            try
+            {
+                await next(ctx);
+            }
+            catch (Exception ex)
+            {
+                var msg = $"Unhandled HTTP pipeline exception: {ex}";
+                Console.Error.WriteLine($"[McpServer] {msg}");
+                if (!string.IsNullOrEmpty(logPath))
+                    try { System.IO.File.AppendAllText(logPath, $"{DateTimeOffset.Now:o} {msg}\r\n"); } catch { }
+                if (!ctx.Response.HasStarted)
+                {
+                    ctx.Response.StatusCode = 500;
+                    ctx.Response.ContentType = "application/json";
+                    var body = System.Text.Json.JsonSerializer.Serialize(new { error = ex.GetType().Name, message = ex.Message, detail = ex.ToString() });
+                    var bytes = System.Text.Encoding.UTF8.GetBytes(body);
+                    await ctx.Response.Body.WriteAsync(bytes, 0, bytes.Length);
+                }
+            }
+        });
+
         app.MapMcp("/mcp");
 
         // Stop the HTTP server when the UWP host app closes
@@ -304,6 +327,9 @@ internal sealed class AppServiceToolBackend : IToolBackend, IDisposable
     private readonly string _logPath = System.IO.Path.Combine(
         Windows.Storage.ApplicationData.Current.LocalFolder.Path,
         "fulltrust-server.log");
+
+    /// <summary>Exposes the log path so HTTP middleware can write to the same log file.</summary>
+    public string LogPath => _logPath;
 
     /// <summary>
     /// Token that is cancelled when the AppService connection to the UWP host is lost

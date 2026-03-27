@@ -118,6 +118,7 @@
     <Compile Include="App.xaml.cs">
       <DependentUpon>App.xaml</DependentUpon>
     </Compile>
+
     <Compile Include="MainPage.xaml.cs">
       <DependentUpon>MainPage.xaml</DependentUpon>
     </Compile>
@@ -196,4 +197,20 @@
   </PropertyGroup>
 
   <Import Project="$(MSBuildExtensionsPath)\Microsoft\WindowsXaml\v$(VisualStudioVersion)\Microsoft.Windows.UI.Xaml.CSharp.targets" />
+
+  <!--
+    Post-build: sync the complete FullTrust publish output into the AppX\FullTrust layout
+    folder so that VS F5 / loose-file deployment has all dependencies alongside the .exe.
+    The UWP build system only copies the .exe launcher; everything else (the .dll entry-
+    point, runtimeconfig, third-party assemblies) must be placed here explicitly.
+  -->
+  <Target Name="SyncFullTrustToAppX" AfterTargets="Build">
+    <ItemGroup>
+      <FullTrustFiles Include="$(MSBuildThisFileDirectory)..\Rover.FullTrust.McpServer\bin\$(Configuration)\net8.0-windows10.0.19041.0\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(FullTrustFiles)"
+          DestinationFiles="@(FullTrustFiles->'$(OutputPath)AppX\FullTrust\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>

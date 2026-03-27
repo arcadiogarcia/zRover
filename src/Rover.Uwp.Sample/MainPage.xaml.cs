@@ -283,11 +283,11 @@ namespace Rover.Uwp.Sample
             byte r, g, b;
             switch (colorName)
             {
-                case "Red":    r = 255; g =   0; b =   0; break;
-                case "Green":  r =   0; g = 255; b =   0; break;
-                case "Blue":   r =   0; g =   0; b = 255; break;
-                case "Yellow": r = 255; g = 255; b =   0; break;
-                case "White":  r = 255; g = 255; b = 255; break;
+                case "Red": r = 255; g = 0; b = 0; break;
+                case "Green": r = 0; g = 255; b = 0; break;
+                case "Blue": r = 0; g = 0; b = 255; break;
+                case "Yellow": r = 255; g = 255; b = 0; break;
+                case "White": r = 255; g = 255; b = 255; break;
                 default:
                     return Task.FromResult(ActionResult.Fail("validation_error",
                         $"params.color: '{colorName}' is not in the valid set [Red, Green, Blue, Yellow, White]"));
@@ -335,9 +335,9 @@ namespace Rover.Uwp.Sample
                 {
                     switch (channel)
                     {
-                        case "R": RedSlider.Value   = value; break;
+                        case "R": RedSlider.Value = value; break;
                         case "G": GreenSlider.Value = value; break;
-                        case "B": BlueSlider.Value  = value; break;
+                        case "B": BlueSlider.Value = value; break;
                     }
                     tcs.TrySetResult(ActionResult.Ok(new[] { "UpdateColorPreview" }));
                 }
@@ -357,9 +357,9 @@ namespace Rover.Uwp.Sample
             switch (tab)
             {
                 case "Color Picker": index = 0; break;
-                case "Text Input":   index = 1; break;
-                case "Ink Canvas":   index = 2; break;
-                case "Scroll Test":  index = 3; break;
+                case "Text Input": index = 1; break;
+                case "Ink Canvas": index = 2; break;
+                case "Scroll Test": index = 3; break;
                 default:
                     return Task.FromResult(ActionResult.Fail("validation_error",
                         $"params.tab: '{tab}' is not in the valid set [Color Picker, Text Input, Ink Canvas, Scroll Test]"));

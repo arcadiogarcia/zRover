@@ -12,19 +12,6 @@ namespace Rover.Uwp.Sample
     {
         public App()
         {
-            this.UnhandledException += (s, args) =>
-            {
-                args.Handled = true;
-                try
-                {
-                    var path = System.IO.Path.Combine(
-                        Windows.Storage.ApplicationData.Current.LocalFolder.Path,
-                        "crash.log");
-                    System.IO.File.AppendAllText(path,
-                        $"{DateTimeOffset.Now:o} UNHANDLED: {args.Exception}\r\n");
-                }
-                catch { }
-            };
             this.InitializeComponent();
             this.Suspending += OnSuspending;
         }
