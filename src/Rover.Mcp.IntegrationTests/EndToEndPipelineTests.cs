@@ -272,6 +272,7 @@ public class EndToEndPipelineTests : IAsyncLifetime
 
         names.Should().Contain("SetPresetColor", "sample app registers SetPresetColor");
         names.Should().Contain("SetColorChannel", "sample app registers SetColorChannel");
+        names.Should().Contain("SwitchTab", "sample app registers SwitchTab");
     }
 
     [Fact]
@@ -327,6 +328,26 @@ public class EndToEndPipelineTests : IAsyncLifetime
         var text = (result.Content[0] as ModelContextProtocol.Protocol.TextContentBlock)!.Text;
         var doc = JsonDocument.Parse(text);
         doc.RootElement.GetProperty("success").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task DispatchAction_SwitchTab_Succeeds()
+    {
+        var result = await _client.CallToolAsync(
+            "dispatch_action",
+            new Dictionary<string, object?>
+            {
+                { "action", "SwitchTab" },
+                { "params", new Dictionary<string, object?> { { "tab", "Text Input" } } }
+            });
+
+        result.IsError.Should().NotBe(true);
+
+        var text = (result.Content[0] as ModelContextProtocol.Protocol.TextContentBlock)!.Text;
+        var doc = JsonDocument.Parse(text);
+        doc.RootElement.GetProperty("success").GetBoolean().Should().BeTrue();
+        doc.RootElement.GetProperty("consequences").EnumerateArray()
+            .Select(c => c.GetString()).Should().Contain("TabChanged");
     }
 
     [Fact]
