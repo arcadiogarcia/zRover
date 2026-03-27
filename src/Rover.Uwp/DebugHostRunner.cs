@@ -72,6 +72,12 @@ namespace Rover.Uwp
                 _capabilities.Add(new ScreenshotCapability());
             if (_options.ActionableApp != null)
                 _capabilities.Add(new AppActionCapability(_options.ActionableApp));
+            if (_options.EnableUiTree)
+                _capabilities.Add(new UiTreeCapability());
+            if (_options.EnableWindowManagement)
+                _capabilities.Add(new WindowCapability());
+            if (_options.EnableWaitFor)
+                _capabilities.Add(new WaitForCapability());
 
             // Start capabilities
             foreach (var capability in _capabilities)

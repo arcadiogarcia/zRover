@@ -32,5 +32,25 @@ namespace Rover.Core
         /// once the buffer is full. Defaults to 2000.
         /// </summary>
         public int LogBufferCapacity { get; set; } = 2000;
+
+        /// <summary>
+        /// Enables the <c>get_ui_tree</c> MCP tool, which returns the XAML visual tree
+        /// as a JSON hierarchy including element types, names, bounds, and text.
+        /// Defaults to <c>true</c>.
+        /// </summary>
+        public bool EnableUiTree { get; set; } = true;
+
+        /// <summary>
+        /// Enables the <c>resize_page</c> MCP tool for programmatic window resizing.
+        /// Defaults to <c>true</c>.
+        /// </summary>
+        public bool EnableWindowManagement { get; set; } = true;
+
+        /// <summary>
+        /// Enables the <c>wait_for</c> MCP tool for blocking on visual stability
+        /// or log pattern conditions.
+        /// Defaults to <c>true</c>.
+        /// </summary>
+        public bool EnableWaitFor { get; set; } = true;
     }
 }

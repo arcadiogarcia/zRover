@@ -10,7 +10,7 @@ Install the NuGet package and integrate in three lines of code:
 dotnet add package Rover.Uwp --prerelease
 ```
 
-See the **[Integration Guide](docs/integration-guide.md)** for complete setup instructions, manifest configuration, MCP client setup for VS Code / Claude / Cursor / Windsurf, the full tool reference (16 tools), and troubleshooting.
+See the **[Integration Guide](docs/integration-guide.md)** for complete setup instructions, manifest configuration, MCP client setup for VS Code / Claude / Cursor / Windsurf, the full tool reference (21 tools), and troubleshooting.
 
 ## Connect an MCP Client
 
@@ -47,8 +47,12 @@ MCP Client (tests, AI agents, etc.)
 │  │                               │
 │  └─ Capabilities                 │
 │     ├─ ScreenshotCapability      │  RenderTargetBitmap → PNG
-│     ├─ InputInjectionCapability  │  InputInjector or XAML automation
-│     └─ AppActionCapability       │  Delegates to IActionableApp
+│     ├─ InputInjectionCapability  │  InputInjector + Win32 SendInput
+│     ├─ LoggingCapability         │  In-memory ring buffer (get_logs)
+│     ├─ AppActionCapability       │  Delegates to IActionableApp
+│     ├─ UiTreeCapability          │  XAML VisualTreeHelper walker
+│     ├─ WindowCapability          │  ApplicationView resize
+│     └─ WaitForCapability         │  visual_stable / log_match polling
 └──────────────────────────────────┘
 ```
 
@@ -73,7 +77,7 @@ MCP Client (tests, AI agents, etc.)
 
 ## MCP Tools
 
-Rover exposes **18 tools** across screenshot capture, touch/mouse, keyboard, pen, gamepad input, and app-defined action dispatch. All input tools use normalized coordinates (0.0–1.0) by default.
+Rover exposes **21 tools** across screenshot capture, touch/mouse, keyboard, pen, gamepad input, app-defined action dispatch, diagnostic logging, XAML UI tree inspection, window management, and condition polling. All input tools use normalized coordinates (0.0–1.0) by default.
 
 See the **[full tool reference](docs/integration-guide.md#available-tools)** for parameters, coordinate spaces, and dry-run preview support.
 
@@ -88,33 +92,23 @@ See the **[full tool reference](docs/integration-guide.md#available-tools)** for
 
 All commands assume the working directory is the repository root.
 
-### 1. Publish the FullTrust MCP server
+### 1. Build and deploy the UWP app
 
 ```powershell
-dotnet publish src\Rover.FullTrust.McpServer\Rover.FullTrust.McpServer.csproj `
-    -c Debug -r win-x64 --self-contained true /p:PublishSingleFile=true
-```
+# Resolve devenv.exe via vswhere (works for any VS edition/version)
+$devenv = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
+    -latest -requires Microsoft.Component.MSBuild -find Common7\IDE\devenv.exe
 
-This produces a single exe at:
-`src\Rover.FullTrust.McpServer\bin\Debug\net8.0-windows10.0.19041.0\win-x64\publish\Rover.FullTrust.McpServer.exe`
-
-The UWP sample project automatically picks it up and includes it in the AppX package as `FullTrust\Rover.FullTrust.McpServer.exe`.
-
-### 2. Build and deploy the UWP app
-
-```powershell
-# Rebuild (compiles Rover.Uwp + Rover.Uwp.Sample + bundles FullTrust exe)
-& "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\devenv.exe" `
-    src\Rover.sln /Rebuild "Debug|x64" /Project "Rover.Uwp.Sample\Rover.Uwp.Sample.csproj"
+# Rebuild (compiles Rover.Uwp + Rover.Uwp.Sample; post-build target syncs FullTrust output into AppX\FullTrust\)
+& $devenv src\Rover.sln /Rebuild "Debug|x64" /Project "Rover.Uwp.Sample\Rover.Uwp.Sample.csproj"
 
 # Deploy (registers the AppX package for sideloading)
-& "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\devenv.exe" `
-    src\Rover.sln /Deploy "Debug|x64" /Project "Rover.Uwp.Sample\Rover.Uwp.Sample.csproj"
+& $devenv src\Rover.sln /Deploy "Debug|x64" /Project "Rover.Uwp.Sample\Rover.Uwp.Sample.csproj"
 ```
 
 > **Important:** Always use `devenv /Deploy` for deployment. Manual `Add-AppxPackage -Register` with file copying to the AppX directory is unreliable because the `bin\x64\Debug\AppX` subdirectory may contain stale files.
 
-### 3. Launch the app
+### 2. Launch the app
 
 ```powershell
 Start-Process "shell:AppsFolder\Rover.Uwp.Sample_xaf3bmhg52ma0!App"
@@ -157,23 +151,20 @@ Runs all 55 tests. The E2E tests will fail if the app isn't running.
 ### Full workflow (build + deploy + launch + test)
 
 ```powershell
-# 1. Publish FullTrust server
-dotnet publish src\Rover.FullTrust.McpServer\Rover.FullTrust.McpServer.csproj `
-    -c Debug -r win-x64 --self-contained true /p:PublishSingleFile=true
+$devenv = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
+    -latest -requires Microsoft.Component.MSBuild -find Common7\IDE\devenv.exe
 
-# 2. Rebuild UWP app
-& "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\devenv.exe" `
-    src\Rover.sln /Rebuild "Debug|x64" /Project "Rover.Uwp.Sample\Rover.Uwp.Sample.csproj"
+# 1. Rebuild UWP app (post-build target auto-syncs FullTrust build output into AppX)
+& $devenv src\Rover.sln /Rebuild "Debug|x64" /Project "Rover.Uwp.Sample\Rover.Uwp.Sample.csproj"
 
-# 3. Deploy
-& "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\devenv.exe" `
-    src\Rover.sln /Deploy "Debug|x64" /Project "Rover.Uwp.Sample\Rover.Uwp.Sample.csproj"
+# 2. Deploy
+& $devenv src\Rover.sln /Deploy "Debug|x64" /Project "Rover.Uwp.Sample\Rover.Uwp.Sample.csproj"
 
-# 4. Launch app and wait for MCP server
+# 3. Launch app and wait for MCP server
 Start-Process "shell:AppsFolder\Rover.Uwp.Sample_xaf3bmhg52ma0!App"
 Start-Sleep -Seconds 5
 
-# 5. Run all tests
+# 4. Run all tests
 dotnet test src\Rover.Mcp.IntegrationTests\Rover.Mcp.IntegrationTests.csproj
 ```
 
@@ -185,107 +176,7 @@ The E2E tests default to `http://localhost:5100/mcp`. Override with:
 $env:ROVER_MCP_ENDPOINT = "http://localhost:5100/mcp"
 ```
 
-## Test Inventory (34 tests)
-
-### McpServerToolTests (8 unit tests)
-- `ServerInfo_ReturnsCorrectName`
-- `ListTools_ReturnsAllRegisteredTools`
-- `ListTools_EachToolHasDescriptionAndSchema`
-- `CallTool_Echo_ReturnsMessage`
-- `CallTool_AddNumbers_ComputesCorrectSum`
-- `CallTool_GetStatus_WorksWithNoArguments`
-- `CallTool_FailingTool_ReturnsError`
-- `Ping_ServerResponds`
-
-### McpToolRegistryAdapterTests (4 unit tests)
-- `RegisterTool_AddsToToolsCollection`
-- `RegisterTool_ProtocolToolHasCorrectMetadata`
-- `RegisterMultipleTools_AllPresent`
-- `ImplementsIMcpToolRegistry`
-
-### DelegateMcpServerToolInvocationTests (2 unit tests)
-- `CallTool_PassesSerializedArguments`
-- `CallTool_WithEmptyArgs_PassesEmptyObject`
-
-### AppActionMcpHandlerTests (13 unit tests)
-- `ListActions_EmptyList_ReturnsEmptyActionsArray`
-- `ListActions_MultipleActions_ReturnsAllInOrder`
-- `ListActions_ActionName_SerializedCorrectly`
-- `ListActions_ActionDescription_SerializedCorrectly`
-- `ListActions_ActionParameterSchema_SerializedAsObject`
-- `ListActions_InvalidParameterSchema_FallsBackToEmptyObject`
-- `DispatchAction_MissingActionField_ReturnsValidationError`
-- `DispatchAction_InvalidJson_ReturnsValidationError`
-- `DispatchAction_MissingParams_DefaultsToEmptyObject`
-- `DispatchAction_Success_ReturnsTrueWithoutConsequences`
-- `DispatchAction_SuccessWithConsequences_ReturnsConsequencesArray`
-- `DispatchAction_AppThrows_ReturnsExecutionError`
-- `DispatchAction_AppReturnsFailure_ReturnsErrorObject`
-
-### EndToEndPipelineTests (18 E2E tests)
-- `Server_Responds_WithCorrectInfo`
-- `Server_Ping_Succeeds`
-- `ListTools_ReturnsRegisteredUwpTools`
-- `ListTools_InjectTap_HasCorrectMetadata`
-- `ListTools_CaptureCurrentView_HasSchema`
-- `ListTools_InjectDragPath_HasPointsSchema`
-- `CaptureCurrentView_ReturnsResult`
-- `InjectTap_WithNormalizedCoordinates_Succeeds`
-- `InjectDragPath_WithTwoPoints_Succeeds`
-- `NonexistentTool_ReturnsError`
-- `ListTools_IncludesAppActionTools`
-- `ListActions_ReturnsActionsArray`
-- `ListActions_SampleApp_ExposesExpectedActions`
-- `ListActions_ActionDescriptors_HaveParameterSchema`
-- `DispatchAction_SetPresetColor_Succeeds`
-- `DispatchAction_SetColorChannel_Succeeds`
-- `DispatchAction_UnknownAction_ReturnsUnknownActionError`
-- `DispatchAction_InvalidParamValue_ReturnsValidationError`
-
-### ColorPickerE2ETests (10 E2E tests)
-- `TapRedButton_PreviewBecomesRed`
-- `TapGreenButton_PreviewBecomesGreen`
-- `TapBlueButton_PreviewBecomesBlue`
-- `TapYellowButton_PreviewBecomesYellow`
-- `TapWhiteButton_PreviewBecomesWhite`
-- `DragRedSlider_IncreasesRedComponent`
-- `DragGreenSlider_IncreasesGreenComponent`
-- `DragBlueSlider_IncreasesBlueComponent`
-- `SequentialColorChanges_PreviewUpdatesEachTime`
-- `Screenshot_HasReasonableDimensions`
-
-## Key Implementation Details
-
-### AppService IPC (in-process model)
-
-The AppService is declared **without** an `EntryPoint` attribute in the manifest, which makes it run in-process. `App.OnBackgroundActivated` handles requests directly, sharing the `ToolRegistry` singleton with the capabilities. This avoids cross-process serialization of tool handlers.
-
-### Screenshot capture
-
-Uses `RenderTargetBitmap.RenderAsync(Window.Current.Content)` on the UI thread → `SoftwareBitmap` → `BitmapEncoder` (PNG). Files are saved to `LocalState\debug-artifacts\screenshots\`. The test process reads them with `FileShare.ReadWrite` to handle concurrent access.
-
-### UWP deployment gotcha
-
-The `bin\x64\Debug\AppxManifest.xml` in the source tree is **not** the manifest to deploy with. MSBuild generates a different manifest at `bin\x64\Debug\Core\AppxManifest.xml` that includes:
-
-- `<PackageDependency>` on `Microsoft.NET.CoreRuntime.2.2` and `Microsoft.NET.CoreFramework.Debug.2.2`
-- A `windows.activatableClass.inProcessServer` extension registering `Microsoft.UI.Xaml.Markup.ReflectionXamlMetadataProvider`
-
-Without these, COM activation fails with `"COM ActivateExtension"` and the app crashes before any managed code runs. Always use `devenv /Rebuild` then `devenv /Deploy` for reliable deployment — those targets handle the generated manifest automatically.
-
-For manual `Add-AppxPackage -Register` workflows, stage from `bin\x64\Debug\Core\AppxManifest.xml` and observe the `.build.appxrecipe` file for the correct file-to-package-path mappings. Note that the two EXEs are **cross-placed**: the 8 KB native UWP bootstrapper (`Core\Rover.Uwp.Sample.exe`) goes to the package root, while the managed module (`bin\x64\Debug\Rover.Uwp.Sample.exe`) goes under `entrypoint\`.
-
-### Slider.ValueChanged during InitializeComponent
-
-XAML fires `Slider.ValueChanged` during `InitializeComponent()` before other named elements are initialized. Subscribe to the event in code-behind **after** `InitializeComponent()` completes to avoid `NullReferenceException` crashes.
-
 ## What's Not Yet Implemented
 
-- **stdio transport** — code exists but is unused; only HTTP is exercised
-- **Mouse injection** — schema accepts `device: "mouse"` but only touch/automation is implemented
-- **Automation fallback for more controls** — only `ButtonBase` and `Slider` are handled; no ToggleSwitch, ListView, TextBox, etc.
-- **Non-UWP platforms** — no WinUI 3 or WPF adapter
-- **MCP resources and prompts** — only tools are implemented
-- **CI/CD pipeline** — tests require a locally deployed UWP app
-- **Auth in production** — Bearer token support exists in `HttpMcpListener` but is unused
-- **Host app integration** — the App Action API (`list_actions` / `dispatch_action`) lets any app expose its own actions; built-in app-specific actions beyond the color picker sample are not included
+- **Non-UWP platforms** — no WinUI 3 or WPF adapter; UWP only
+- **Auth** — Bearer token opt-in exists in `DebugHostOptions` but is disabled by default

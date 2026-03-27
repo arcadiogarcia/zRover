@@ -25,6 +25,10 @@ Add AI-driven UI automation to any UWP app. Rover exposes your app's screen and 
   - [Pen Input Tools](#pen-input-tools)
   - [Gamepad Tools](#gamepad-tools)
   - [App Action Tools](#app-action-tools)
+  - [Logging Tools](#logging-tools)
+  - [UI Tree Tools](#ui-tree-tools)
+  - [Window Tools](#window-tools)
+  - [Wait Tools](#wait-tools)
 - [Coordinate Spaces](#coordinate-spaces)
 - [Preview & Dry Run](#preview--dry-run)
 - [Requirements & Limitations](#requirements--limitations)
@@ -276,7 +280,7 @@ var tools = await client.ListToolsAsync();
 
 ## Available Tools
 
-Rover registers **18 tools** organized across screenshot capture, touch/mouse, keyboard, pen, gamepad input, and app-defined action dispatch.
+Rover registers **21 tools** organized across screenshot capture, touch/mouse, keyboard, pen, gamepad input, app-defined action dispatch, logging, UI tree inspection, window management, and condition polling.
 
 ### Screenshot Tools
 
@@ -641,6 +645,81 @@ protected override async void OnLaunched(LaunchActivatedEventArgs e)
 ```
 
 > **Thread safety:** `GetAvailableActions()` is called from the AppService IPC thread (background). `DispatchAsync` receives the call on a background thread — marshal any UI work to `Dispatcher.RunAsync` as shown above.
+
+---
+
+### Logging Tools
+
+#### `get_logs`
+
+Returns recent entries from the Rover in-memory log store. Useful for understanding app state, diagnosing failures, and reading lifecycle and exception events logged by the host app.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `minimumLevel` | string | `"info"` | Minimum level: `"trace"`, `"debug"`, `"info"`, `"warning"`, `"error"`, `"fatal"` |
+| `maxEntries` | integer | `100` | Maximum number of entries to return (newest first) |
+| `category` | string | *(none)* | Filter to entries whose category starts with this string |
+| `clear` | boolean | `false` | If `true`, clears the buffer after returning the snapshot |
+
+---
+
+### UI Tree Tools
+
+#### `get_ui_tree`
+
+Walks the XAML visual tree and returns a structured representation of every UI element. Useful for discovering element names, automation IDs, text content, and positions without taking a screenshot.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `maxDepth` | integer | `32` | Maximum depth to traverse into the visual tree |
+| `visibleOnly` | boolean | `false` | If `true`, excludes elements whose `Visibility` is `Collapsed` |
+
+**Returns:** A tree of nodes. Each node has:
+- `type` — XAML class name (e.g. `"Button"`, `"TextBlock"`)
+- `name` — `x:Name` value, if set
+- `automationName` — `AutomationProperties.Name` value, if set
+- `text` — text content extracted from `TextBlock`, `TextBox`, or `ContentControl`
+- `bounds` — `{ x, y, width, height }` in normalized coordinates (0.0–1.0)
+- `isVisible` — whether the element is in the visible state
+- `isEnabled` — whether the element is enabled
+- `children` — nested child nodes
+
+---
+
+### Window Tools
+
+#### `resize_page`
+
+Resizes the app window to the specified dimensions.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `width` | number | *(required)* | Desired window width in DIPs |
+| `height` | number | *(required)* | Desired window height in DIPs |
+
+**Returns:** `{ success, actualWidth, actualHeight }` — the actual bounds after resize (the OS may constrain the requested size).
+
+---
+
+### Wait Tools
+
+#### `wait_for`
+
+Blocks until a condition is met or the timeout expires. Use this to synchronize with animations, loading states, or async events before proceeding with other tools.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `condition` | string | *(required)* | `"visual_stable"` or `"log_match"` |
+| `timeoutMs` | integer | `5000` | Maximum time to wait in milliseconds |
+| `stabilityMs` | integer | `400` | (`visual_stable` only) How long the UI must remain unchanged to count as stable |
+| `intervalMs` | integer | `150` | Polling interval in milliseconds |
+| `pattern` | string | *(none)* | (`log_match` only) Regex pattern to match against log messages |
+
+**Conditions:**
+- `visual_stable` — polls screenshot hashes until the image is unchanged for `stabilityMs`. Good for waiting after animations, page transitions, or loading indicators.
+- `log_match` — polls the in-memory log store until an entry matching `pattern` appears. Good for waiting for a specific event to be logged by the host app.
+
+**Returns:** `{ success, condition, elapsedMs, reason }` — `reason` explains why the wait ended (e.g. `"stable"`, `"matched"`, `"timeout"`).
 
 ---
 
