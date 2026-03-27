@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Rover.Core;
+using Rover.Core.Logging;
 
 namespace Rover.Uwp
 {
@@ -12,6 +13,13 @@ namespace Rover.Uwp
         private static DebugHostRunner? _runner;
         private static Func<Task>? _fullTrustLauncher;
 
+        /// <summary>
+        /// The in-memory log store for the running Rover instance.
+        /// Backed by <see cref="RoverLog.Store"/>.
+        /// MCP clients access this via the <c>get_logs</c> tool;
+        /// host app code can write to it through <see cref="RoverLog"/>.
+        /// </summary>
+        public static IInMemoryLogStore LogStore => RoverLog.Store;
         /// <summary>
         /// Sets the callback to launch the FullTrust MCP server process.
         /// Call this before StartAsync to enable out-of-process MCP server.

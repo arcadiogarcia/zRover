@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Rover.Core.Coordinates;
+using Rover.Core.Logging;
 
 namespace Rover.Core
 {
@@ -16,16 +17,24 @@ namespace Rover.Core
         /// </summary>
         public Func<Func<Task>, Task>? RunOnUiThread { get; }
 
+        /// <summary>
+        /// The active in-memory log store. All Rover infrastructure and the host
+        /// application write here; MCP clients read from it via the <c>get_logs</c> tool.
+        /// </summary>
+        public IInMemoryLogStore LogStore { get; }
+
         public DebugHostContext(
             DebugHostOptions options,
             ICoordinateResolver coordinateResolver,
             string artifactDirectory,
-            Func<Func<Task>, Task>? runOnUiThread = null)
+            Func<Func<Task>, Task>? runOnUiThread = null,
+            IInMemoryLogStore? logStore = null)
         {
             Options = options;
             CoordinateResolver = coordinateResolver;
             ArtifactDirectory = artifactDirectory;
             RunOnUiThread = runOnUiThread;
+            LogStore = logStore ?? RoverLog.Store;
         }
     }
 }

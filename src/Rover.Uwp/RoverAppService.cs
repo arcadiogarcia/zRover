@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Rover.Core.Logging;
 using Windows.ApplicationModel.Activation;
 using Windows.ApplicationModel.AppService;
 using Windows.ApplicationModel.Background;
@@ -50,7 +51,10 @@ namespace Rover.Uwp
             var connection = details.AppServiceConnection;
 
             taskInstance.Canceled += (s, r) =>
+            {
+                RoverLog.Warn("Rover.AppService", $"AppService task canceled: {r}");
                 System.Diagnostics.Debug.WriteLine($"[Rover.AppService] Canceled: {r}");
+            };
 
             connection.RequestReceived += async (sender, reqArgs) =>
             {
@@ -73,10 +77,12 @@ namespace Rover.Uwp
 
             connection.ServiceClosed += (sender, closeArgs) =>
             {
+                RoverLog.Info("Rover.AppService", $"AppService connection closed: {closeArgs.Status}");
                 System.Diagnostics.Debug.WriteLine($"[Rover.AppService] Closed: {closeArgs.Status}");
                 deferral.Complete();
             };
 
+            RoverLog.Info("Rover.AppService", "AppService connection ready");
             System.Diagnostics.Debug.WriteLine("[Rover.AppService] Ready");
             return true;
         }
@@ -86,6 +92,7 @@ namespace Rover.Uwp
             var response = new ValueSet();
             var command = request.ContainsKey("command") ? request["command"] as string : null;
 
+            RoverLog.Trace("Rover.AppService", $"Command received: {command}");
             System.Diagnostics.Debug.WriteLine($"[Rover.AppService] Command: {command}");
 
             switch (command)
@@ -111,6 +118,7 @@ namespace Rover.Uwp
                     }
                     response["status"] = "success";
                     response["tools"] = JsonConvert.SerializeObject(toolList);
+                    RoverLog.Trace("Rover.AppService", $"list_tools: {allTools.Count} tools returned");
                     System.Diagnostics.Debug.WriteLine($"[Rover.AppService] Listed {allTools.Count} tools");
                     break;
 
@@ -135,6 +143,7 @@ namespace Rover.Uwp
                     var result = await handler(argsJson ?? "{}").ConfigureAwait(false);
                     response["status"] = "success";
                     response["result"] = result;
+                    RoverLog.Trace("Rover.AppService", $"invoke_tool '{toolName}' succeeded");
                     System.Diagnostics.Debug.WriteLine($"[Rover.AppService] Tool '{toolName}' invoked");
                     break;
 

@@ -18,5 +18,19 @@ namespace Rover.Core
         /// observe and drive the host application through a stable, self-describing interface.
         /// </summary>
         public IActionableApp? ActionableApp { get; set; }
+
+        /// <summary>
+        /// Enables the in-memory log store and the <c>get_logs</c> MCP tool.
+        /// When active, UWP lifecycle events, unhandled exceptions, and XAML binding
+        /// failures are automatically captured without any extra code in the host app.
+        /// Defaults to <c>true</c>.
+        /// </summary>
+        public bool EnableLogging { get; set; } = true;
+
+        /// <summary>
+        /// Maximum number of log entries kept in memory. Older entries are overwritten
+        /// once the buffer is full. Defaults to 2000.
+        /// </summary>
+        public int LogBufferCapacity { get; set; } = 2000;
     }
 }
