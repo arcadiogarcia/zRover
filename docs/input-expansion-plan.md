@@ -1,11 +1,11 @@
-# Rover Input Injection Expansion Plan
+# zRover Input Injection Expansion Plan
 
 > **Validated against SDK:** `Windows.winmd` from Windows SDK 10.0.26100.0.
 > All type shapes, enum values, and property names below are verified against the actual WinMD metadata.
 
 ## Goal
 
-Expand Rover from the current two MCP tools (`inject_tap`, `inject_drag_path`) to comprehensive coverage of **keyboard**, **mouse** (expanded), **multitouch**, **pen**, and **gamepad** input — all injected from the UWP app via `Windows.UI.Input.Preview.Injection.InputInjector`.
+Expand zRover from the current two MCP tools (`inject_tap`, `inject_drag_path`) to comprehensive coverage of **keyboard**, **mouse** (expanded), **multitouch**, **pen**, and **gamepad** input — all injected from the UWP app via `Windows.UI.Input.Preview.Injection.InputInjector`.
 
 **Scope:** UWP implementation only. Win32 `SendInput` fallbacks are out of scope for now and documented as gaps at the bottom.
 
@@ -19,9 +19,9 @@ Expand Rover from the current two MCP tools (`inject_tap`, `inject_drag_path`) t
 | `inject_drag_path` | ✅ | ✅ | Multi-waypoint drag with smooth interpolation. Preview with path visualization. |
 
 **Architecture (preserved for all new tools):**
-1. **Rover.Core** — Request/Response DTOs + JSON schemas
-2. **Rover.Uwp / InputInjectionCapability** — UWP `InputInjector` implementation + XAML automation fallback + preview screenshots
-3. **Rover.FullTrust.McpServer / Program.cs** — Proxy registration (pass-through to UWP for now)
+1. **zRover.Core** — Request/Response DTOs + JSON schemas
+2. **zRover.Uwp / InputInjectionCapability** — UWP `InputInjector` implementation + XAML automation fallback + preview screenshots
+3. **zRover.FullTrust.McpServer / Program.cs** — Proxy registration (pass-through to UWP for now)
 
 ---
 
@@ -800,11 +800,11 @@ Multiple gamepad frames for complex inputs (stick sweeps, combos, racing inputs)
 
 ### Per-tool checklist (UWP-focused)
 
-1. **Rover.Core — DTOs**
+1. **zRover.Core — DTOs**
    - Create `[ToolName]Request.cs` and `[ToolName]Response.cs` in `Tools/InputInjection/`
    - Dual serialization attributes (`#if !WINDOWS_UWP` for `System.Text.Json`, always `Newtonsoft.Json`)
 
-2. **Rover.Uwp — InputInjectionCapability**
+2. **zRover.Uwp — InputInjectionCapability**
    - Add JSON Schema string constant
    - Register tool in `RegisterTools()` 
    - Implement async handler (`Inject[Tool]Async(string argsJson)`)
@@ -812,11 +812,11 @@ Multiple gamepad frames for complex inputs (stick sweeps, combos, racing inputs)
    - XAML automation fallback where applicable
    - Preview screenshot annotation (extend `ScreenshotAnnotator`)
 
-3. **Rover.FullTrust.McpServer — Pass-through proxy**
+3. **zRover.FullTrust.McpServer — Pass-through proxy**
    - Register as transparent proxy: `backend.InvokeToolAsync(name, argsJson)`
    - No Win32 fallback for now (documented gap)
 
-4. **Testing** in `Rover.Uwp.Sample`
+4. **Testing** in `zRover.Uwp.Sample`
 
 ### Phase order
 
@@ -921,7 +921,7 @@ private struct INPUT {
 
 ## New File Inventory
 
-### Rover.Core/Tools/InputInjection/ (new DTOs)
+### zRover.Core/Tools/InputInjection/ (new DTOs)
 | File | Phase |
 |------|-------|
 | `InjectKeyPressRequest.cs` | 1 |
@@ -949,7 +949,7 @@ private struct INPUT {
 | `InjectGamepadSequenceRequest.cs` | 5 |
 | `InjectGamepadSequenceResponse.cs` | 5 |
 
-### Rover.Uwp/Capabilities/ (partial class files)
+### zRover.Uwp/Capabilities/ (partial class files)
 | File | Phase |
 |------|-------|
 | `InputInjectionCapability.Keyboard.cs` | 1 |

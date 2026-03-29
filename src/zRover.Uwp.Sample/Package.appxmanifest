@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  IgnorableNamespaces="uap mp rescap desktop">
+
+  <Identity
+    Name="zRover.Uwp.Sample"
+    Publisher="CN=arcad"
+    Version="1.0.0.0" />
+
+  <mp:PhoneIdentity PhoneProductId="a1270004-b000-4000-8000-000000000004" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
+
+  <Properties>
+    <DisplayName>zRover Sample</DisplayName>
+    <PublisherDisplayName>arcad</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="x-generate" />
+  </Resources>
+
+  <Applications>
+    <Application Id="App"
+      Executable="$targetnametoken$.exe"
+      EntryPoint="zRover.Uwp.Sample.App">
+      <uap:VisualElements
+        DisplayName="zRover Sample"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png"
+        Description="zRover MCP Debug Host — Sample App"
+        BackgroundColor="transparent">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+        <uap:SplashScreen Image="Assets\SplashScreen.png" />
+      </uap:VisualElements>
+
+      <Extensions>
+        <!-- In-process AppService: FullTrustProcess talks to tools via this service.
+             No EntryPoint = in-process mode: OnBackgroundActivated handles requests
+             in the same process, sharing ToolRegistry.Instance. -->
+        <uap:Extension Category="windows.appService">
+          <uap:AppService Name="com.zrover.toolinvocation" />
+        </uap:Extension>
+
+        <!-- FullTrust process: the .NET 8 MCP server packaged alongside -->
+        <desktop:Extension Category="windows.fullTrustProcess"
+                           Executable="FullTrust\zRover.FullTrust.McpServer.exe">
+          <desktop:FullTrustProcess>
+            <desktop:ParameterGroup GroupId="McpServer" Parameters="" />
+          </desktop:FullTrustProcess>
+        </desktop:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <Capability Name="internetClient" />
+    <Capability Name="internetClientServer" />
+    <Capability Name="privateNetworkClientServer" />
+    <rescap:Capability Name="runFullTrust" />
+    <rescap:Capability Name="inputInjectionBrokered" />
+    <rescap:Capability Name="inputInjection" />
+  </Capabilities>
+
+</Package>

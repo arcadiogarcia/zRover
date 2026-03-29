@@ -1,6 +1,6 @@
-# Rover Integration Guide
+# zRover Integration Guide
 
-Add AI-driven UI automation to any UWP app. Rover exposes your app's screen and input as [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) tools, letting AI agents, test harnesses, and other MCP clients capture screenshots, inject touch/mouse/keyboard/pen/gamepad input, and validate coordinates — all over a standard HTTP endpoint.
+Add AI-driven UI automation to any UWP app. zRover exposes your app's screen and input as [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) tools, letting AI agents, test harnesses, and other MCP clients capture screenshots, inject touch/mouse/keyboard/pen/gamepad input, and validate coordinates — all over a standard HTTP endpoint.
 
 ## Table of Contents
 
@@ -45,22 +45,22 @@ Add AI-driven UI automation to any UWP app. Rover exposes your app's screen and 
 
 ## Install the NuGet Package
 
-> **Debug builds only.** Rover is a development and testing tool — it exposes your app's screen and input over an unauthenticated local HTTP endpoint. **Never include Rover in release or production builds.** Exclude it from your release configuration (see [Add the Package Reference](#1-add-the-package-reference)).
+> **Debug builds only.** zRover is a development and testing tool — it exposes your app's screen and input over an unauthenticated local HTTP endpoint. **Never include zRover in release or production builds.** Exclude it from your release configuration (see [Add the Package Reference](#1-add-the-package-reference)).
 
 ```
-dotnet add package Rover.Uwp --prerelease
+dotnet add package zRover.Uwp --prerelease
 ```
 
 Or add to your `.csproj`:
 
 ```xml
-<PackageReference Include="Rover.Uwp" />
+<PackageReference Include="zRover.Uwp" />
 ```
 
 Omit the `Version` attribute to always restore the latest available pre-release. If you need to pin a version, pass `--version` to the CLI or add a `Version` attribute.
 
 The package includes:
-- **Rover.Uwp.dll** — the UWP library you call from your app
+- **zRover.Uwp.dll** — the UWP library you call from your app
 - **FullTrust companion server** — a .NET 8 MCP HTTP server (included for both x64 and ARM64)
 - **MSBuild targets** — automatically adds the FullTrust binaries to your AppX package and references the Desktop Extensions SDK
 
@@ -68,13 +68,13 @@ The package includes:
 
 ### 1. Add the Package Reference
 
-Add the `Rover.Uwp` NuGet package to your UWP app project **for debug configurations only**. The simplest way is to wrap the reference in a condition so it is excluded from release builds:
+Add the `zRover.Uwp` NuGet package to your UWP app project **for debug configurations only**. The simplest way is to wrap the reference in a condition so it is excluded from release builds:
 
 ```xml
-<PackageReference Include="Rover.Uwp" Condition="'$(Configuration)' == 'Debug'" />
+<PackageReference Include="zRover.Uwp" Condition="'$(Configuration)' == 'Debug'" />
 ```
 
-This ensures Rover's FullTrust binaries, manifest extensions, and capabilities are never shipped in a release package.
+This ensures zRover's FullTrust binaries, manifest extensions, and capabilities are never shipped in a release package.
 
 The package's MSBuild auto-import handles:
 
@@ -102,12 +102,12 @@ Open your `Package.appxmanifest` and add the required namespaces, extensions, an
 <Extensions>
   <!-- In-process AppService for internal communication -->
   <uap:Extension Category="windows.appService">
-    <uap:AppService Name="com.rover.toolinvocation" />
+    <uap:AppService Name="com.zrover.toolinvocation" />
   </uap:Extension>
 
   <!-- FullTrust MCP server packaged alongside your app -->
   <desktop:Extension Category="windows.fullTrustProcess"
-                     Executable="FullTrust\Rover.FullTrust.McpServer.exe">
+                     Executable="FullTrust\zRover.FullTrust.McpServer.exe">
     <desktop:FullTrustProcess>
       <desktop:ParameterGroup GroupId="McpServer" Parameters="" />
     </desktop:FullTrustProcess>
@@ -131,7 +131,7 @@ Open your `Package.appxmanifest` and add the required namespaces, extensions, an
 
 ### 3. Wire Up App.xaml.cs
 
-Rover requires exactly **three touch-points** in your `App.xaml.cs`:
+zRover requires exactly **three touch-points** in your `App.xaml.cs`:
 
 ```csharp
 using Windows.ApplicationModel;
@@ -165,17 +165,17 @@ sealed partial class App : Application
             Window.Current.Activate();
         }
 
-        // --- Rover: Start the MCP server ---
-        await Rover.Uwp.RoverMcp.StartAsync("MyApp", port: 5100,
+        // --- zRover: Start the MCP server ---
+        await zRover.Uwp.RoverMcp.StartAsync("MyApp", port: 5100,
             () => FullTrustProcessLauncher
                 .LaunchFullTrustProcessForCurrentAppAsync("McpServer")
                 .AsTask());
     }
 
-    // --- Rover: Route AppService requests ---
+    // --- zRover: Route AppService requests ---
     protected override void OnBackgroundActivated(BackgroundActivatedEventArgs args)
     {
-        if (Rover.Uwp.RoverMcp.HandleBackgroundActivation(args)) return;
+        if (zRover.Uwp.RoverMcp.HandleBackgroundActivation(args)) return;
         base.OnBackgroundActivated(args);
     }
 
@@ -183,8 +183,8 @@ sealed partial class App : Application
     {
         var deferral = e.SuspendingOperation.GetDeferral();
 
-        // --- Rover: Clean shutdown ---
-        Rover.Uwp.RoverMcp.Stop();
+        // --- zRover: Clean shutdown ---
+        zRover.Uwp.RoverMcp.Stop();
 
         deferral.Complete();
     }
@@ -202,7 +202,7 @@ That's it. Build and run your app — the MCP server will start listening on `ht
 | `appName` | `string` | *(required)* | Display name shown to MCP clients |
 | `port` | `int` | `5100` | TCP port the MCP server listens on |
 | `launchFullTrust` | `Func<Task>?` | `null` | Callback to launch the FullTrust companion. Pass the `FullTrustProcessLauncher` call as shown above. If `null`, no companion server starts (tools register but aren't reachable externally). |
-| `actionableApp` | `IActionableApp?` | `null` | Optional implementation of `Rover.Core.IActionableApp` to expose app-defined actions via the `list_actions` and `dispatch_action` MCP tools. See [App Action Tools](#app-action-tools). |
+| `actionableApp` | `IActionableApp?` | `null` | Optional implementation of `zRover.Core.IActionableApp` to expose app-defined actions via the `list_actions` and `dispatch_action` MCP tools. See [App Action Tools](#app-action-tools). |
 
 ## Connecting MCP Clients
 
@@ -225,7 +225,7 @@ Add to `.vscode/mcp.json` in your workspace:
 
 Or via CLI:
 ```
-code --add-mcp '{"name":"rover","url":"http://localhost:5100/mcp"}'
+code --add-mcp '{"name":"zrover","url":"http://localhost:5100/mcp"}'
 ```
 
 ### Claude Desktop
@@ -292,7 +292,7 @@ var tools = await client.ListToolsAsync();
 
 ## Available Tools
 
-Rover registers **22 tools** organized across screenshot capture, touch/mouse, keyboard, pen, gamepad input, app-defined action dispatch, logging, UI tree inspection, window management, and condition polling.
+zRover registers **22 tools** organized across screenshot capture, touch/mouse, keyboard, pen, gamepad input, app-defined action dispatch, logging, UI tree inspection, window management, and condition polling.
 
 ### Screenshot Tools
 
@@ -528,7 +528,7 @@ Injects a series of gamepad frames in order. After the last frame, all inputs ar
 
 ### App Action Tools
 
-App Action tools expose the host application's own discrete operations as MCP tools. Your app opts in by implementing `Rover.Core.IActionableApp` and passing the instance to `RoverMcp.StartAsync`. The two tools are always registered as a pair; if no `IActionableApp` is provided, neither tool appears in `tools/list`.
+App Action tools expose the host application's own discrete operations as MCP tools. Your app opts in by implementing `zRover.Core.IActionableApp` and passing the instance to `RoverMcp.StartAsync`. The two tools are always registered as a pair; if no `IActionableApp` is provided, neither tool appears in `tools/list`.
 
 #### `list_actions`
 
@@ -584,7 +584,7 @@ Add the interface to any class accessible from `App.xaml.cs`, typically your mai
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
-using Rover.Core;
+using zRover.Core;
 
 public sealed partial class MainPage : Page, IActionableApp
 {
@@ -648,8 +648,8 @@ protected override async void OnLaunched(LaunchActivatedEventArgs e)
 {
     // ... navigation setup, Window.Current.Activate() ...
 
-    var actionableApp = rootFrame.Content as Rover.Core.IActionableApp;
-    await Rover.Uwp.RoverMcp.StartAsync("MyApp", port: 5100,
+    var actionableApp = rootFrame.Content as zRover.Core.IActionableApp;
+    await zRover.Uwp.RoverMcp.StartAsync("MyApp", port: 5100,
         launchFullTrust: () => FullTrustProcessLauncher
             .LaunchFullTrustProcessForCurrentAppAsync("McpServer").AsTask(),
         actionableApp: actionableApp);
@@ -664,7 +664,7 @@ protected override async void OnLaunched(LaunchActivatedEventArgs e)
 
 #### `get_logs`
 
-Returns recent entries from the Rover in-memory log store. Useful for understanding app state, diagnosing failures, and reading lifecycle and exception events logged by the host app.
+Returns recent entries from the zRover in-memory log store. Useful for understanding app state, diagnosing failures, and reading lifecycle and exception events logged by the host app.
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|

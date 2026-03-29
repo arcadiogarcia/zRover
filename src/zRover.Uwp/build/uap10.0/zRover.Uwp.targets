@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!--
+    zRover.Uwp NuGet auto-import targets
+    Adds:
+      1. WindowsDesktop SDK reference (provides FullTrustProcessLauncher)
+      2. FullTrust companion server binaries as Content items in the AppX package
+  -->
+
+  <!-- 1. Desktop Extension SDK for FullTrustProcessLauncher -->
+  <ItemGroup>
+    <SDKReference Include="WindowsDesktop, Version=$(TargetPlatformVersion)">
+      <Name>Windows Desktop Extensions for the UWP</Name>
+    </SDKReference>
+  </ItemGroup>
+
+  <!-- 2. Resolve FullTrust companion binaries based on build platform.
+       For explicit platforms (ARM64, x64, etc.) we use the matching RID directly.
+       For AnyCPU, we detect the build machine's OS architecture so the correct
+       native FullTrust binary is included — this is critical on ARM64 machines
+       where the x64 InputInjector COM component fails under emulation. -->
+  <PropertyGroup>
+    <_zRoverHostIsArm64>$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)</_zRoverHostIsArm64>
+    <_zRoverFullTrustRid Condition="'$(Platform)' == 'ARM64'">win-arm64</_zRoverFullTrustRid>
+    <_zRoverFullTrustRid Condition="'$(Platform)' == 'ARM'">win-arm64</_zRoverFullTrustRid>
+    <_zRoverFullTrustRid Condition="'$(Platform)' == 'x64'">win-x64</_zRoverFullTrustRid>
+    <_zRoverFullTrustRid Condition="'$(Platform)' == 'x86'">win-x64</_zRoverFullTrustRid>
+    <_zRoverFullTrustRid Condition="'$(Platform)' == 'AnyCPU' AND '$(_zRoverHostIsArm64)' == 'Arm64'">win-arm64</_zRoverFullTrustRid>
+    <_zRoverFullTrustRid Condition="'$(Platform)' == 'AnyCPU' AND '$(_zRoverHostIsArm64)' != 'Arm64'">win-x64</_zRoverFullTrustRid>
+    <_zRoverFullTrustDir>$(MSBuildThisFileDirectory)..\..\tools\fulltrust\$(_zRoverFullTrustRid)\</_zRoverFullTrustDir>
+  </PropertyGroup>
+
+  <!-- Include all FullTrust companion binaries as AppX content under FullTrust\ -->
+  <ItemGroup Condition="Exists('$(_zRoverFullTrustDir)zRover.FullTrust.McpServer.exe')">
+    <Content Include="$(_zRoverFullTrustDir)**\*">
+      <Link>FullTrust\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

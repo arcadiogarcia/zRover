@@ -1,0 +1,46 @@
+#if !WINDOWS_UWP
+using System.Text.Json.Serialization;
+#endif
+using Newtonsoft.Json;
+
+namespace zRover.Core.Tools.Screenshot
+{
+    public sealed class CaptureRegionRequest
+    {
+        #if !WINDOWS_UWP
+        [JsonPropertyName("x")]
+#endif
+        [JsonProperty("x")]
+        public double X { get; set; }
+
+        #if !WINDOWS_UWP
+        [JsonPropertyName("y")]
+#endif
+        [JsonProperty("y")]
+        public double Y { get; set; }
+
+        #if !WINDOWS_UWP
+        [JsonPropertyName("width")]
+#endif
+        [JsonProperty("width")]
+        public double Width { get; set; }
+
+        #if !WINDOWS_UWP
+        [JsonPropertyName("height")]
+#endif
+        [JsonProperty("height")]
+        public double Height { get; set; }
+
+        #if !WINDOWS_UWP
+        [JsonPropertyName("maxWidth")]
+#endif
+        [JsonProperty("maxWidth")]
+        public int? MaxWidth { get; set; }
+
+        #if !WINDOWS_UWP
+        [JsonPropertyName("maxHeight")]
+#endif
+        [JsonProperty("maxHeight")]
+        public int? MaxHeight { get; set; }
+    }
+}

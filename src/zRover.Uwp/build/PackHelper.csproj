@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <NuspecFile>$(MSBuildThisFileDirectory)..\zRover.Uwp.nuspec</NuspecFile>
+    <NuspecBasePath>$(MSBuildThisFileDirectory)..</NuspecBasePath>
+    <!-- Prevent actual compilation -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+  </PropertyGroup>
+</Project>

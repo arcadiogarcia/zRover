@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{A1270003-B000-4000-8000-000000000003}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>zRover.Uwp</RootNamespace>
+    <AssemblyName>zRover.Uwp</AssemblyName>
+    <DefaultLanguage>en-US</DefaultLanguage>
+    <TargetPlatformIdentifier>UAP</TargetPlatformIdentifier>
+    <TargetPlatformVersion Condition=" '$(TargetPlatformVersion)' == '' ">10.0.26100.0</TargetPlatformVersion>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    <MinimumVisualStudioVersion>14</MinimumVisualStudioVersion>
+    <FileAlignment>512</FileAlignment>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ProjectTypeGuids>{A5A43C5B-DE2A-4C0C-9213-0A381AF9435A};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE;NETFX_CORE;WINDOWS_UWP</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE;NETFX_CORE;WINDOWS_UWP</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|ARM'">
+    <PlatformTarget>ARM</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\ARM\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE;NETFX_CORE;WINDOWS_UWP</DefineConstants>
+    <NoWarn>;2008</NoWarn>
+    <DebugType>full</DebugType>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+    <ErrorReport>prompt</ErrorReport>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|ARM'">
+    <PlatformTarget>ARM</PlatformTarget>
+    <OutputPath>bin\ARM\Release\</OutputPath>
+    <DefineConstants>TRACE;NETFX_CORE;WINDOWS_UWP</DefineConstants>
+    <Optimize>true</Optimize>
+    <NoWarn>;2008</NoWarn>
+    <DebugType>pdbonly</DebugType>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+    <ErrorReport>prompt</ErrorReport>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|ARM64'">
+    <PlatformTarget>ARM64</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\ARM64\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE;NETFX_CORE;WINDOWS_UWP</DefineConstants>
+    <NoWarn>;2008</NoWarn>
+    <DebugType>full</DebugType>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+    <ErrorReport>prompt</ErrorReport>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|ARM64'">
+    <PlatformTarget>ARM64</PlatformTarget>
+    <OutputPath>bin\ARM64\Release\</OutputPath>
+    <DefineConstants>TRACE;NETFX_CORE;WINDOWS_UWP</DefineConstants>
+    <Optimize>true</Optimize>
+    <NoWarn>;2008</NoWarn>
+    <DebugType>pdbonly</DebugType>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+    <ErrorReport>prompt</ErrorReport>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <PlatformTarget>x64</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x64\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE;NETFX_CORE;WINDOWS_UWP</DefineConstants>
+    <NoWarn>;2008</NoWarn>
+    <DebugType>full</DebugType>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+    <ErrorReport>prompt</ErrorReport>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+    <PlatformTarget>x64</PlatformTarget>
+    <OutputPath>bin\x64\Release\</OutputPath>
+    <DefineConstants>TRACE;NETFX_CORE;WINDOWS_UWP</DefineConstants>
+    <Optimize>true</Optimize>
+    <NoWarn>;2008</NoWarn>
+    <DebugType>pdbonly</DebugType>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+    <ErrorReport>prompt</ErrorReport>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
+    <PlatformTarget>x86</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x86\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE;NETFX_CORE;WINDOWS_UWP</DefineConstants>
+    <NoWarn>;2008</NoWarn>
+    <DebugType>full</DebugType>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+    <ErrorReport>prompt</ErrorReport>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x86'">
+    <PlatformTarget>x86</PlatformTarget>
+    <OutputPath>bin\x86\Release\</OutputPath>
+    <DefineConstants>TRACE;NETFX_CORE;WINDOWS_UWP</DefineConstants>
+    <Optimize>true</Optimize>
+    <NoWarn>;2008</NoWarn>
+    <DebugType>pdbonly</DebugType>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+    <ErrorReport>prompt</ErrorReport>
+  </PropertyGroup>
+  <PropertyGroup>
+    <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="AppService\ToolRegistry.cs" />
+    <Compile Include="Capabilities\InputInjectionCapability.cs" />
+    <Compile Include="Capabilities\InputInjectionCapability.Keyboard.cs" />
+    <Compile Include="Capabilities\InputInjectionCapability.Mouse.cs" />
+    <Compile Include="Capabilities\InputInjectionCapability.Touch.cs" />
+    <Compile Include="Capabilities\InputInjectionCapability.Pen.cs" />
+    <Compile Include="Capabilities\InputInjectionCapability.Gamepad.cs" />
+    <Compile Include="Capabilities\AppActionCapability.cs" />
+    <Compile Include="Capabilities\LoggingCapability.cs" />
+    <Compile Include="Capabilities\ScreenshotAnnotator.cs" />
+    <Compile Include="Capabilities\ScreenshotCapability.cs" />
+    <Compile Include="Capabilities\UiTreeCapability.cs" />
+    <Compile Include="Capabilities\WaitForCapability.cs" />
+    <Compile Include="Capabilities\WindowCapability.cs" />
+    <Compile Include="Coordinates\UwpCoordinateResolver.cs" />
+    <Compile Include="DebugHost.cs" />
+    <Compile Include="DebugHostRunner.cs" />
+    <Compile Include="RoverAppService.cs" />
+    <Compile Include="RoverMcp.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <!-- netstandard.dll shim: required so the compiler can resolve base types (System.Enum,
+       System.Object, etc.) that are defined in cross-assembly netstandard2.0 references
+       such as zRover.Core / zRover.Mcp / ModelContextProtocol.Core. -->
+  <ItemGroup>
+    <Reference Include="netstandard">
+      <HintPath>$(NuGetPackageRoot)netstandard.library\2.0.3\build\netstandard2.0\ref\netstandard.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETCore.UniversalWindowsPlatform">
+      <Version>6.2.14</Version>
+    </PackageReference>
+    <PackageReference Include="Newtonsoft.Json">
+      <Version>13.0.3</Version>
+    </PackageReference>
+  </ItemGroup>
+  <!-- zRover.Core source linked directly so that no netstandard2.0
+       project outputs appear in the XAML compiler's type universe when apps
+       reference this UAP library. -->
+  <ItemGroup>
+    <Compile Include="..\zRover.Core\DebugHostContext.cs" Link="Linked\zRover.Core\DebugHostContext.cs" />
+    <Compile Include="..\zRover.Core\DebugHostOptions.cs" Link="Linked\zRover.Core\DebugHostOptions.cs" />
+    <Compile Include="..\zRover.Core\IDebugCapability.cs" Link="Linked\zRover.Core\IDebugCapability.cs" />
+    <Compile Include="..\zRover.Core\IMcpToolRegistry.cs" Link="Linked\zRover.Core\IMcpToolRegistry.cs" />
+    <Compile Include="..\zRover.Core\IActionableApp.cs" Link="Linked\zRover.Core\IActionableApp.cs" />
+    <Compile Include="..\zRover.Core\AppActionMcpHandlers.cs" Link="Linked\zRover.Core\AppActionMcpHandlers.cs" />
+    <Compile Include="..\zRover.Core\Coordinates\CoordinatePoint.cs" Link="Linked\zRover.Core\Coordinates\CoordinatePoint.cs" />
+    <Compile Include="..\zRover.Core\Coordinates\CoordinateSpace.cs" Link="Linked\zRover.Core\Coordinates\CoordinateSpace.cs" />
+    <Compile Include="..\zRover.Core\Coordinates\ICoordinateResolver.cs" Link="Linked\zRover.Core\Coordinates\ICoordinateResolver.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectDragPathRequest.cs" Link="Linked\zRover.Core\Tools\InjectDragPathRequest.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectDragPathResponse.cs" Link="Linked\zRover.Core\Tools\InjectDragPathResponse.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectTapRequest.cs" Link="Linked\zRover.Core\Tools\InjectTapRequest.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectTapResponse.cs" Link="Linked\zRover.Core\Tools\InjectTapResponse.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectKeyPressRequest.cs" Link="Linked\zRover.Core\Tools\InjectKeyPressRequest.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectKeyPressResponse.cs" Link="Linked\zRover.Core\Tools\InjectKeyPressResponse.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectTextRequest.cs" Link="Linked\zRover.Core\Tools\InjectTextRequest.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectTextResponse.cs" Link="Linked\zRover.Core\Tools\InjectTextResponse.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectMouseScrollRequest.cs" Link="Linked\zRover.Core\Tools\InjectMouseScrollRequest.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectMouseScrollResponse.cs" Link="Linked\zRover.Core\Tools\InjectMouseScrollResponse.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectMouseMoveRequest.cs" Link="Linked\zRover.Core\Tools\InjectMouseMoveRequest.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectMouseMoveResponse.cs" Link="Linked\zRover.Core\Tools\InjectMouseMoveResponse.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectMultiTouchRequest.cs" Link="Linked\zRover.Core\Tools\InjectMultiTouchRequest.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectMultiTouchResponse.cs" Link="Linked\zRover.Core\Tools\InjectMultiTouchResponse.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectPinchRequest.cs" Link="Linked\zRover.Core\Tools\InjectPinchRequest.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectPinchResponse.cs" Link="Linked\zRover.Core\Tools\InjectPinchResponse.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectRotateRequest.cs" Link="Linked\zRover.Core\Tools\InjectRotateRequest.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectRotateResponse.cs" Link="Linked\zRover.Core\Tools\InjectRotateResponse.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectPenTapRequest.cs" Link="Linked\zRover.Core\Tools\InjectPenTapRequest.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectPenTapResponse.cs" Link="Linked\zRover.Core\Tools\InjectPenTapResponse.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\PenStrokePoint.cs" Link="Linked\zRover.Core\Tools\PenStrokePoint.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectPenStrokeRequest.cs" Link="Linked\zRover.Core\Tools\InjectPenStrokeRequest.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectPenStrokeResponse.cs" Link="Linked\zRover.Core\Tools\InjectPenStrokeResponse.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectGamepadInputRequest.cs" Link="Linked\zRover.Core\Tools\InjectGamepadInputRequest.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectGamepadInputResponse.cs" Link="Linked\zRover.Core\Tools\InjectGamepadInputResponse.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\GamepadFrame.cs" Link="Linked\zRover.Core\Tools\GamepadFrame.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectGamepadSequenceRequest.cs" Link="Linked\zRover.Core\Tools\InjectGamepadSequenceRequest.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\InjectGamepadSequenceResponse.cs" Link="Linked\zRover.Core\Tools\InjectGamepadSequenceResponse.cs" />
+    <Compile Include="..\zRover.Core\Tools\Screenshot\CaptureViewRequest.cs" Link="Linked\zRover.Core\Tools\CaptureViewRequest.cs" />
+    <Compile Include="..\zRover.Core\Tools\Screenshot\CaptureViewResponse.cs" Link="Linked\zRover.Core\Tools\CaptureViewResponse.cs" />
+    <Compile Include="..\zRover.Core\Tools\Screenshot\CaptureRegionRequest.cs" Link="Linked\zRover.Core\Tools\CaptureRegionRequest.cs" />
+    <Compile Include="..\zRover.Core\Tools\Screenshot\CaptureRegionResponse.cs" Link="Linked\zRover.Core\Tools\CaptureRegionResponse.cs" />
+    <Compile Include="..\zRover.Core\Tools\Screenshot\ValidatePositionRequest.cs" Link="Linked\zRover.Core\Tools\ValidatePositionRequest.cs" />
+    <Compile Include="..\zRover.Core\Tools\Screenshot\ValidatePositionResponse.cs" Link="Linked\zRover.Core\Tools\ValidatePositionResponse.cs" />
+    <Compile Include="..\zRover.Core\Tools\UiTree\UiTreeRequest.cs" Link="Linked\zRover.Core\Tools\UiTree\UiTreeRequest.cs" />
+    <Compile Include="..\zRover.Core\Tools\UiTree\UiTreeNode.cs" Link="Linked\zRover.Core\Tools\UiTree\UiTreeNode.cs" />
+    <Compile Include="..\zRover.Core\Tools\UiTree\UiTreeResponse.cs" Link="Linked\zRover.Core\Tools\UiTree\UiTreeResponse.cs" />
+    <Compile Include="..\zRover.Core\Tools\Window\ResizeWindowRequest.cs" Link="Linked\zRover.Core\Tools\Window\ResizeWindowRequest.cs" />
+    <Compile Include="..\zRover.Core\Tools\Window\ResizeWindowResponse.cs" Link="Linked\zRover.Core\Tools\Window\ResizeWindowResponse.cs" />
+    <Compile Include="..\zRover.Core\Tools\WaitFor\WaitForRequest.cs" Link="Linked\zRover.Core\Tools\WaitFor\WaitForRequest.cs" />
+    <Compile Include="..\zRover.Core\Tools\WaitFor\WaitForResponse.cs" Link="Linked\zRover.Core\Tools\WaitFor\WaitForResponse.cs" />
+    <Compile Include="..\zRover.Core\Logging\LogEntry.cs" Link="Linked\zRover.Core\Logging\LogEntry.cs" />
+    <Compile Include="..\zRover.Core\Logging\IInMemoryLogStore.cs" Link="Linked\zRover.Core\Logging\IInMemoryLogStore.cs" />
+    <Compile Include="..\zRover.Core\Logging\InMemoryLogStore.cs" Link="Linked\zRover.Core\Logging\InMemoryLogStore.cs" />
+    <Compile Include="..\zRover.Core\Logging\RoverLog.cs" Link="Linked\zRover.Core\Logging\RoverLog.cs" />
+  </ItemGroup>
+  <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '14.0' ">
+    <VisualStudioVersion>14.0</VisualStudioVersion>
+  </PropertyGroup>
+  <Import Project="$(MSBuildExtensionsPath)\Microsoft\WindowsXaml\v$(VisualStudioVersion)\Microsoft.Windows.UI.Xaml.CSharp.targets" />
+</Project>

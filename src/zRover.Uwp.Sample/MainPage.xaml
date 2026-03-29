@@ -1,0 +1,392 @@
+<Page
+    x:Class="zRover.Uwp.Sample.MainPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <Pivot>
+        <!-- ===== Tab 1: Color Picker ===== -->
+        <PivotItem Header="Color Picker">
+            <!--
+                Layout uses proportional rows so normalized-coordinate tests
+                can target elements at predictable Y positions.
+            -->
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="1*"/>
+                    <RowDefinition Height="1*"/>
+                    <RowDefinition Height="1*"/>
+                    <RowDefinition Height="1*"/>
+                    <RowDefinition Height="4*"/>
+                    <RowDefinition Height="1*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Row 0: Preset color buttons (5 equal columns) -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1*"/>
+                        <ColumnDefinition Width="1*"/>
+                        <ColumnDefinition Width="1*"/>
+                        <ColumnDefinition Width="1*"/>
+                        <ColumnDefinition Width="1*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Button Content="Red"
+                            Grid.Column="0"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Stretch"
+                            Margin="4"
+                            Click="PresetColor_Click"
+                            Tag="FF0000"
+                            Foreground="White"
+                            FontWeight="Bold">
+                        <Button.Background>
+                            <SolidColorBrush Color="#FFFF0000"/>
+                        </Button.Background>
+                    </Button>
+                    <Button Content="Green"
+                            Grid.Column="1"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Stretch"
+                            Margin="4"
+                            Click="PresetColor_Click"
+                            Tag="00FF00"
+                            Foreground="White"
+                            FontWeight="Bold">
+                        <Button.Background>
+                            <SolidColorBrush Color="#FF00FF00"/>
+                        </Button.Background>
+                    </Button>
+                    <Button Content="Blue"
+                            Grid.Column="2"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Stretch"
+                            Margin="4"
+                            Click="PresetColor_Click"
+                            Tag="0000FF"
+                            Foreground="White"
+                            FontWeight="Bold">
+                        <Button.Background>
+                            <SolidColorBrush Color="#FF0000FF"/>
+                        </Button.Background>
+                    </Button>
+                    <Button Content="Yellow"
+                            Grid.Column="3"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Stretch"
+                            Margin="4"
+                            Click="PresetColor_Click"
+                            Tag="FFFF00"
+                            FontWeight="Bold">
+                        <Button.Background>
+                            <SolidColorBrush Color="#FFFFFF00"/>
+                        </Button.Background>
+                    </Button>
+                    <Button Content="White"
+                            Grid.Column="4"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Stretch"
+                            Margin="4"
+                            Click="PresetColor_Click"
+                            Tag="FFFFFF"
+                            FontWeight="Bold">
+                        <Button.Background>
+                            <SolidColorBrush Color="#FFFFFFFF"/>
+                        </Button.Background>
+                    </Button>
+                </Grid>
+
+                <!-- Row 1: R slider -->
+                <Grid Grid.Row="1"
+                        Padding="20,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="30"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="40"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="R"
+                            VerticalAlignment="Center"
+                            FontSize="18"
+                            Foreground="Red"
+                            FontWeight="Bold"/>
+                    <Slider x:Name="RedSlider"
+                            Grid.Column="1"
+                            Minimum="0"
+                            Maximum="255"
+                            Value="0"
+                            VerticalAlignment="Center"/>
+                    <TextBlock x:Name="RedValue"
+                            Grid.Column="2"
+                            Text="0"
+                               VerticalAlignment="Center"
+                            HorizontalAlignment="Center"/>
+                </Grid>
+
+                <!-- Row 2: G slider -->
+                <Grid Grid.Row="2"
+                        Padding="20,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="30"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="40"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="G"
+                            VerticalAlignment="Center"
+                            FontSize="18"
+                            Foreground="Green"
+                            FontWeight="Bold"/>
+                    <Slider x:Name="GreenSlider"
+                            Grid.Column="1"
+                            Minimum="0"
+                            Maximum="255"
+                            Value="0"
+                            VerticalAlignment="Center"/>
+                    <TextBlock x:Name="GreenValue"
+                            Grid.Column="2"
+                            Text="0"
+                               VerticalAlignment="Center"
+                            HorizontalAlignment="Center"/>
+                </Grid>
+
+                <!-- Row 3: B slider -->
+                <Grid Grid.Row="3"
+                        Padding="20,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="30"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="40"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="B"
+                            VerticalAlignment="Center"
+                            FontSize="18"
+                            Foreground="Blue"
+                            FontWeight="Bold"/>
+                    <Slider x:Name="BlueSlider"
+                            Grid.Column="1"
+                            Minimum="0"
+                            Maximum="255"
+                            Value="0"
+                            VerticalAlignment="Center"/>
+                    <TextBlock x:Name="BlueValue"
+                            Grid.Column="2"
+                            Text="0"
+                               VerticalAlignment="Center"
+                            HorizontalAlignment="Center"/>
+                </Grid>
+
+                <!-- Row 4: Color preview -->
+                <Rectangle x:Name="ColorPreview"
+                        Grid.Row="4"
+                        Margin="20,10">
+                    <Rectangle.Fill>
+                        <SolidColorBrush x:Name="PreviewBrush"
+                                Color="#FF000000"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+
+                <!-- Row 5: Hex color readout -->
+                <TextBlock x:Name="HexLabel"
+                        Grid.Row="5"
+                        Text="#000000"
+                           FontSize="28"
+                        FontFamily="Consolas"
+                           HorizontalAlignment="Center"
+                        VerticalAlignment="Center"/>
+            </Grid>
+        </PivotItem>
+
+        <!-- ===== Tab 2: Text Input ===== -->
+        <PivotItem Header="Text Input">
+            <Grid Padding="20">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="Type or inject text below:"
+                        FontSize="16"
+                        Margin="0,0,0,8"/>
+
+                <TextBox x:Name="TestTextBox"
+                        Grid.Row="1"
+                         PlaceholderText="Click here and type or use inject_text / inject_key_press..."
+                         FontSize="18"
+                        Height="44"
+                         AcceptsReturn="False"/>
+
+                <TextBox x:Name="MultiLineTextBox"
+                        Grid.Row="2"
+                         PlaceholderText="Multi-line text area — supports Enter key, scrolling, selection..."
+                         FontSize="16"
+                        Margin="0,12,0,0"
+                         AcceptsReturn="True"
+                        TextWrapping="Wrap"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+
+                <StackPanel Grid.Row="3"
+                        Orientation="Horizontal"
+                        Margin="0,12,0,0"
+                        HorizontalAlignment="Center">
+                    <Button x:Name="ClearTextBtn"
+                            Content="Clear All"
+                            Click="ClearText_Click"
+                            Margin="0,0,12,0"/>
+                    <TextBlock x:Name="CharCountLabel"
+                            Text="Chars: 0"
+                            VerticalAlignment="Center"
+                            FontSize="14"/>
+                </StackPanel>
+            </Grid>
+        </PivotItem>
+
+        <!-- ===== Tab 3: Ink Canvas ===== -->
+        <PivotItem Header="Ink Canvas">
+            <Grid Padding="20">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="Draw with pen, touch, or mouse"
+                           FontSize="14"
+                        TextWrapping="Wrap"
+                        Margin="0,0,0,8"/>
+
+                <Border Grid.Row="1"
+                        BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                        BorderThickness="2"
+                        CornerRadius="4">
+                    <InkCanvas x:Name="TestInkCanvas"/>
+                </Border>
+
+                <StackPanel Grid.Row="2"
+                        Orientation="Horizontal"
+                        Margin="0,12,0,0"
+                        HorizontalAlignment="Center">
+                    <Button x:Name="ClearInkBtn"
+                            Content="Clear Ink"
+                            Click="ClearInk_Click"
+                            Margin="0,0,8,0"/>
+                    <Button x:Name="PenModeBtn"
+                            Content="Pen"
+                            Click="InkMode_Click"
+                            Tag="pen"
+                            Margin="0,0,8,0"/>
+                    <Button x:Name="EraserModeBtn"
+                            Content="Eraser"
+                            Click="InkMode_Click"
+                            Tag="eraser"
+                            Margin="0,0,8,0"/>
+                    <Button x:Name="HighlighterBtn"
+                            Content="Highlighter"
+                            Click="InkMode_Click"
+                            Tag="highlighter"
+                            Margin="0,0,8,0"/>
+                    <TextBlock x:Name="StrokeCountLabel"
+                            Text="Strokes: 0"
+                            VerticalAlignment="Center"
+                            FontSize="14"/>
+                </StackPanel>
+            </Grid>
+        </PivotItem>
+
+        <!-- ===== Tab 4: Scroll Test ===== -->
+        <PivotItem Header="Scroll Test">
+            <ScrollViewer x:Name="TestScrollViewer"
+                    VerticalScrollBarVisibility="Visible">
+                <StackPanel Padding="20">
+                    <TextBlock Text="Scroll Test Area"
+                            FontSize="24"
+                            FontWeight="Bold"
+                            Margin="0,0,0,12"/>
+                    <TextBlock Text="Use inject_mouse_scroll to scroll this content up and down."
+                               FontSize="14"
+                            TextWrapping="Wrap"
+                            Margin="0,0,0,12"/>
+                    <Rectangle Fill="Red"
+                            Height="80"
+                            HorizontalAlignment="Stretch"
+                            Margin="0,0,0,4"/>
+                    <TextBlock Text="Red zone"
+                            FontSize="16"
+                            HorizontalAlignment="Center"
+                            Margin="0,0,0,8"/>
+                    <Rectangle Fill="Orange"
+                            Height="80"
+                            HorizontalAlignment="Stretch"
+                            Margin="0,0,0,4"/>
+                    <TextBlock Text="Orange zone"
+                            FontSize="16"
+                            HorizontalAlignment="Center"
+                            Margin="0,0,0,8"/>
+                    <Rectangle Fill="Yellow"
+                            Height="80"
+                            HorizontalAlignment="Stretch"
+                            Margin="0,0,0,4"/>
+                    <TextBlock Text="Yellow zone"
+                            FontSize="16"
+                            HorizontalAlignment="Center"
+                            Margin="0,0,0,8"/>
+                    <Rectangle Fill="Green"
+                            Height="80"
+                            HorizontalAlignment="Stretch"
+                            Margin="0,0,0,4"/>
+                    <TextBlock Text="Green zone"
+                            FontSize="16"
+                            HorizontalAlignment="Center"
+                            Margin="0,0,0,8"/>
+                    <Rectangle Fill="Cyan"
+                            Height="80"
+                            HorizontalAlignment="Stretch"
+                            Margin="0,0,0,4"/>
+                    <TextBlock Text="Cyan zone"
+                            FontSize="16"
+                            HorizontalAlignment="Center"
+                            Margin="0,0,0,8"/>
+                    <Rectangle Fill="Blue"
+                            Height="80"
+                            HorizontalAlignment="Stretch"
+                            Margin="0,0,0,4"/>
+                    <TextBlock Text="Blue zone"
+                            FontSize="16"
+                            HorizontalAlignment="Center"
+                            Margin="0,0,0,8"/>
+                    <Rectangle Fill="Purple"
+                            Height="80"
+                            HorizontalAlignment="Stretch"
+                            Margin="0,0,0,4"/>
+                    <TextBlock Text="Purple zone"
+                            FontSize="16"
+                            HorizontalAlignment="Center"
+                            Margin="0,0,0,8"/>
+                    <Rectangle Fill="Pink"
+                            Height="80"
+                            HorizontalAlignment="Stretch"
+                            Margin="0,0,0,4"/>
+                    <TextBlock Text="Pink zone"
+                            FontSize="16"
+                            HorizontalAlignment="Center"
+                            Margin="0,0,0,8"/>
+                    <Rectangle Fill="Brown"
+                            Height="80"
+                            HorizontalAlignment="Stretch"
+                            Margin="0,0,0,4"/>
+                    <TextBlock Text="Brown zone"
+                            FontSize="16"
+                            HorizontalAlignment="Center"
+                            Margin="0,0,0,8"/>
+                    <Rectangle Fill="Gray"
+                            Height="80"
+                            HorizontalAlignment="Stretch"
+                            Margin="0,0,0,4"/>
+                    <TextBlock Text="Gray zone — Bottom!"
+                            FontSize="16"
+                            HorizontalAlignment="Center"/>
+                </StackPanel>
+            </ScrollViewer>
+        </PivotItem>
+    </Pivot>
+</Page>

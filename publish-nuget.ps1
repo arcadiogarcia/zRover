@@ -1,16 +1,16 @@
 <#
 .SYNOPSIS
-  Builds and publishes the Rover.Uwp NuGet package to nuget.org.
+  Builds and publishes the zRover.Uwp NuGet package to nuget.org.
 
 .DESCRIPTION
-  1. Builds Rover.Uwp.dll (Release)
+  1. Builds zRover.Uwp.dll (Release)
   2. Publishes the FullTrust companion for win-x64 and win-arm64
   3. Packs the .nupkg via PackHelper.csproj
   4. Pushes to nuget.org using the NUGET_API_KEY environment variable
 
 .PARAMETER Version
   Package version to publish (e.g. "0.2.0-preview"). If omitted, uses
-  the version already in Rover.Uwp.nuspec.
+  the version already in zRover.Uwp.nuspec.
 
 .PARAMETER DryRun
   Build and pack only; skip the push to nuget.org.
@@ -42,7 +42,7 @@ if (-not (Test-Path $msbuild)) {
 if (-not (Test-Path $msbuild)) { throw "MSBuild not found. Install Visual Studio with the UWP workload." }
 
 # --- Optional: stamp version into nuspec ---
-$nuspecPath = Join-Path $srcDir 'Rover.Uwp\Rover.Uwp.nuspec'
+$nuspecPath = Join-Path $srcDir 'zRover.Uwp\zRover.Uwp.nuspec'
 if ($Version) {
     Write-Host "Stamping version $Version into nuspec..."
     $xml = [xml](Get-Content $nuspecPath -Raw)
@@ -53,16 +53,16 @@ if ($Version) {
 # Read the version we'll publish
 $nuspecXml = [xml](Get-Content $nuspecPath -Raw)
 $pkgVersion = $nuspecXml.package.metadata.version
-Write-Host "=== Building Rover.Uwp $pkgVersion ===" -ForegroundColor Cyan
+Write-Host "=== Building zRover.Uwp $pkgVersion ===" -ForegroundColor Cyan
 
-# --- 1. Build Rover.Uwp.dll (Release) ---
-Write-Host "`n--- Building Rover.Uwp (Release) ---"
-& $msbuild (Join-Path $srcDir 'Rover.Uwp\Rover.Uwp.csproj') `
+# --- 1. Build zRover.Uwp.dll (Release) ---
+Write-Host "`n--- Building zRover.Uwp (Release) ---"
+& $msbuild (Join-Path $srcDir 'zRover.Uwp\zRover.Uwp.csproj') `
     /p:Configuration=Release /p:Platform=AnyCPU /t:Build /v:minimal
-if ($LASTEXITCODE -ne 0) { throw "Rover.Uwp build failed" }
+if ($LASTEXITCODE -ne 0) { throw "zRover.Uwp build failed" }
 
 # --- 2. Publish FullTrust companion for both RIDs ---
-$ftDir = Join-Path $srcDir 'Rover.FullTrust.McpServer'
+$ftDir = Join-Path $srcDir 'zRover.FullTrust.McpServer'
 foreach ($rid in @('win-x64', 'win-arm64')) {
     Write-Host "`n--- Publishing FullTrust ($rid) ---"
     Push-Location $ftDir
@@ -73,15 +73,15 @@ foreach ($rid in @('win-x64', 'win-arm64')) {
 
 # --- 3. Pack .nupkg ---
 Write-Host "`n--- Packing NuGet package ---"
-$packDir = Join-Path $srcDir 'Rover.Uwp\build'
-$outDir = Join-Path $srcDir 'Rover.Uwp\bin\nupkg'
+$packDir = Join-Path $srcDir 'zRover.Uwp\build'
+$outDir = Join-Path $srcDir 'zRover.Uwp\bin\nupkg'
 Push-Location $packDir
 dotnet restore PackHelper.csproj --verbosity quiet
 dotnet pack PackHelper.csproj -o $outDir --no-build
 if ($LASTEXITCODE -ne 0) { Pop-Location; throw "NuGet pack failed" }
 Pop-Location
 
-$nupkg = Join-Path $outDir "Rover.Uwp.$pkgVersion.nupkg"
+$nupkg = Join-Path $outDir "zRover.Uwp.$pkgVersion.nupkg"
 if (-not (Test-Path $nupkg)) { throw "Expected package not found: $nupkg" }
 $sizeMB = [math]::Round((Get-Item $nupkg).Length / 1MB, 2)
 Write-Host "`nPackage ready: $nupkg ($sizeMB MB)" -ForegroundColor Green
@@ -102,4 +102,4 @@ Write-Host "`n--- Pushing to nuget.org ---"
 dotnet nuget push $nupkg --source https://api.nuget.org/v3/index.json --api-key $apiKey --skip-duplicate
 if ($LASTEXITCODE -ne 0) { throw "NuGet push failed" }
 
-Write-Host "`nPublished Rover.Uwp $pkgVersion to nuget.org" -ForegroundColor Green
+Write-Host "`nPublished zRover.Uwp $pkgVersion to nuget.org" -ForegroundColor Green
