@@ -20,17 +20,47 @@ namespace Rover.Core.Tools.Screenshot
         [JsonProperty("filePath")]
         public string? FilePath { get; set; }
 
+        /// <summary>
+        /// Width of the returned bitmap file in pixels (may be less than windowWidth
+        /// if maxWidth rescaling was applied).
+        /// </summary>
         #if !WINDOWS_UWP
-        [JsonPropertyName("width")]
+        [JsonPropertyName("bitmapWidth")]
 #endif
-        [JsonProperty("width")]
-        public int Width { get; set; }
+        [JsonProperty("bitmapWidth")]
+        public int BitmapWidth { get; set; }
 
+        /// <summary>
+        /// Height of the returned bitmap file in pixels (may be less than windowHeight
+        /// if maxHeight rescaling was applied).
+        /// </summary>
         #if !WINDOWS_UWP
-        [JsonPropertyName("height")]
+        [JsonPropertyName("bitmapHeight")]
 #endif
-        [JsonProperty("height")]
-        public int Height { get; set; }
+        [JsonProperty("bitmapHeight")]
+        public int BitmapHeight { get; set; }
+
+        /// <summary>
+        /// Render-pixel width of the window content before any maxWidth rescaling.
+        /// Use this as the coordinate space width for coordinateSpace="pixels" injection.
+        /// Equals bitmapWidth when no rescaling occurred.
+        /// </summary>
+        #if !WINDOWS_UWP
+        [JsonPropertyName("windowWidth")]
+#endif
+        [JsonProperty("windowWidth")]
+        public int WindowWidth { get; set; }
+
+        /// <summary>
+        /// Render-pixel height of the window content before any maxHeight rescaling.
+        /// Use this as the coordinate space height for coordinateSpace="pixels" injection.
+        /// Equals bitmapHeight when no rescaling occurred.
+        /// </summary>
+        #if !WINDOWS_UWP
+        [JsonPropertyName("windowHeight")]
+#endif
+        [JsonProperty("windowHeight")]
+        public int WindowHeight { get; set; }
 
         #if !WINDOWS_UWP
         [JsonPropertyName("timestamp")]
@@ -39,6 +69,4 @@ namespace Rover.Core.Tools.Screenshot
         public string Timestamp { get; set; } = DateTimeOffset.UtcNow.ToString("O");
     }
 }
-
-
 

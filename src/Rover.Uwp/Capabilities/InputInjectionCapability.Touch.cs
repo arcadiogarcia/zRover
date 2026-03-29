@@ -32,7 +32,7 @@ namespace Rover.Uwp.Capabilities
       ""description"": ""Array of pointer paths to inject simultaneously.""
     },
     ""durationMs"": { ""type"": ""integer"", ""default"": 400, ""description"": ""Total gesture duration in ms."" },
-    ""coordinateSpace"": { ""type"": ""string"", ""enum"": [""absolute"", ""normalized"", ""client""], ""default"": ""normalized"" },
+    ""coordinateSpace"": { ""type"": ""string"", ""enum"": [""normalized"", ""pixels""], ""default"": ""normalized"" },
     ""dryRun"": { ""type"": ""boolean"", ""default"": false }
   },
   ""required"": [""pointers""]
@@ -47,7 +47,7 @@ namespace Rover.Uwp.Capabilities
     ""endDistance"": { ""type"": ""number"", ""default"": 0.1, ""description"": ""Ending distance between fingers (normalized). Less than startDistance = pinch in, greater = pinch out."" },
     ""angle"": { ""type"": ""number"", ""default"": 0, ""description"": ""Angle of the pinch axis in degrees."" },
     ""durationMs"": { ""type"": ""integer"", ""default"": 400 },
-    ""coordinateSpace"": { ""type"": ""string"", ""enum"": [""absolute"", ""normalized"", ""client""], ""default"": ""normalized"" },
+    ""coordinateSpace"": { ""type"": ""string"", ""enum"": [""normalized"", ""pixels""], ""default"": ""normalized"" },
     ""dryRun"": { ""type"": ""boolean"", ""default"": false }
   },
   ""required"": [""centerX"", ""centerY""]
@@ -62,7 +62,7 @@ namespace Rover.Uwp.Capabilities
     ""startAngle"": { ""type"": ""number"", ""default"": 0, ""description"": ""Starting angle in degrees."" },
     ""endAngle"": { ""type"": ""number"", ""default"": 90, ""description"": ""Ending angle in degrees. Positive = clockwise."" },
     ""durationMs"": { ""type"": ""integer"", ""default"": 400 },
-    ""coordinateSpace"": { ""type"": ""string"", ""enum"": [""absolute"", ""normalized"", ""client""], ""default"": ""normalized"" },
+    ""coordinateSpace"": { ""type"": ""string"", ""enum"": [""normalized"", ""pixels""], ""default"": ""normalized"" },
     ""dryRun"": { ""type"": ""boolean"", ""default"": false }
   },
   ""required"": [""centerX"", ""centerY""]
@@ -167,10 +167,10 @@ namespace Rover.Uwp.Capabilities
         private void InjectMultiTouchGesture(InputInjector injector, InjectMultiTouchRequest req)
         {
             var space = ParseSpace(req.CoordinateSpace);
+
+            // InjectedInputPoint uses physical pixels offset by virtual desktop origin.
             var dispInfo = Windows.Graphics.Display.DisplayInformation.GetForCurrentView();
             double dpiScale = dispInfo.RawPixelsPerViewPixel;
-
-            // Resolve all paths to raw pixels
             var resolvedPaths = new List<List<(int x, int y)>>();
             foreach (var pointer in req.Pointers)
             {
@@ -178,7 +178,7 @@ namespace Rover.Uwp.Capabilities
                 foreach (var pt in pointer.Path)
                 {
                     var resolved = _resolver!.Resolve(pt, space);
-                    rawPath.Add(((int)(resolved.X * dpiScale), (int)(resolved.Y * dpiScale)));
+                    rawPath.Add(ToTouchInjectionPoint(resolved.X, resolved.Y, dpiScale));
                 }
                 resolvedPaths.Add(rawPath);
             }
@@ -207,7 +207,8 @@ namespace Rover.Uwp.Capabilities
                         PointerId = (uint)ptr.Id,
                         PointerOptions = InjectedInputPointerOptions.PointerDown
                                        | InjectedInputPointerOptions.InContact
-                                       | InjectedInputPointerOptions.New,
+                                       | InjectedInputPointerOptions.New
+                                       | (p == 0 ? InjectedInputPointerOptions.Primary : InjectedInputPointerOptions.None),
                         PixelLocation = new InjectedInputPoint { PositionX = start.x, PositionY = start.y }
                     },
                     Pressure = ptr.Pressure,

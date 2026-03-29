@@ -67,9 +67,20 @@ namespace Rover.Uwp.Capabilities
                     {
                         var view = ApplicationView.GetForCurrentView();
                         accepted = view.TryResizeView(new Size(req.Width, req.Height));
-                        var bounds = view.VisibleBounds;
-                        actualWidth = bounds.Width;
-                        actualHeight = bounds.Height;
+                        // Return ActualWidth/Height of Window.Current.Content — same reference
+                        // as get_ui_tree bounds and capture_current_view windowWidth/windowHeight.
+                        var content = Windows.UI.Xaml.Window.Current?.Content as Windows.UI.Xaml.FrameworkElement;
+                        if (content != null)
+                        {
+                            actualWidth  = content.ActualWidth;
+                            actualHeight = content.ActualHeight;
+                        }
+                        else
+                        {
+                            var bounds = view.VisibleBounds;
+                            actualWidth  = bounds.Width;
+                            actualHeight = bounds.Height;
+                        }
                         return Task.CompletedTask;
                     }).ConfigureAwait(false);
                 }

@@ -45,6 +45,8 @@ Add AI-driven UI automation to any UWP app. Rover exposes your app's screen and 
 
 ## Install the NuGet Package
 
+> **Debug builds only.** Rover is a development and testing tool — it exposes your app's screen and input over an unauthenticated local HTTP endpoint. **Never include Rover in release or production builds.** Exclude it from your release configuration (see [Add the Package Reference](#1-add-the-package-reference)).
+
 ```
 dotnet add package Rover.Uwp --prerelease
 ```
@@ -52,8 +54,10 @@ dotnet add package Rover.Uwp --prerelease
 Or add to your `.csproj`:
 
 ```xml
-<PackageReference Include="Rover.Uwp" Version="0.1.0-preview" />
+<PackageReference Include="Rover.Uwp" />
 ```
+
+Omit the `Version` attribute to always restore the latest available pre-release. If you need to pin a version, pass `--version` to the CLI or add a `Version` attribute.
 
 The package includes:
 - **Rover.Uwp.dll** — the UWP library you call from your app
@@ -64,7 +68,15 @@ The package includes:
 
 ### 1. Add the Package Reference
 
-Add the `Rover.Uwp` NuGet package to your UWP app project. The package's MSBuild auto-import handles:
+Add the `Rover.Uwp` NuGet package to your UWP app project **for debug configurations only**. The simplest way is to wrap the reference in a condition so it is excluded from release builds:
+
+```xml
+<PackageReference Include="Rover.Uwp" Condition="'$(Configuration)' == 'Debug'" />
+```
+
+This ensures Rover's FullTrust binaries, manifest extensions, and capabilities are never shipped in a release package.
+
+The package's MSBuild auto-import handles:
 
 - Referencing the **Windows Desktop Extensions SDK** (needed for `FullTrustProcessLauncher`)
 - Including the FullTrust companion server binaries in your AppX under `FullTrust\`
@@ -280,7 +292,7 @@ var tools = await client.ListToolsAsync();
 
 ## Available Tools
 
-Rover registers **21 tools** organized across screenshot capture, touch/mouse, keyboard, pen, gamepad input, app-defined action dispatch, logging, UI tree inspection, window management, and condition polling.
+Rover registers **22 tools** organized across screenshot capture, touch/mouse, keyboard, pen, gamepad input, app-defined action dispatch, logging, UI tree inspection, window management, and condition polling.
 
 ### Screenshot Tools
 
@@ -294,7 +306,7 @@ Captures the entire app window as a PNG screenshot.
 | `maxWidth` | integer | `1280` | Maximum image width in pixels (scaled proportionally) |
 | `maxHeight` | integer | `1280` | Maximum image height in pixels |
 
-**Returns:** `{ success, filePath, width, height }` — use `width` and `height` to convert pixel positions to normalized coordinates: `normalizedX = px / width`.
+**Returns:** `{ success, filePath, bitmapWidth, bitmapHeight, windowWidth, windowHeight }` — `bitmapWidth`/`bitmapHeight` are the PNG dimensions; `windowWidth`/`windowHeight` are the render-pixel size of the window (use for the `pixels` coordinate space). Convert to normalized: `normalizedX = bitmapX / bitmapWidth`.
 
 #### `validate_position`
 
@@ -332,7 +344,7 @@ Taps at the specified coordinates. Returns an annotated screenshot showing the t
 |---|---|---|---|
 | `x` | number | *(required)* | X coordinate |
 | `y` | number | *(required)* | Y coordinate |
-| `coordinateSpace` | string | `"normalized"` | `"normalized"`, `"client"`, or `"absolute"` |
+| `coordinateSpace` | string | `"normalized"` | `"normalized"` (0.0–1.0 relative to window) or `"pixels"` (render pixels matching `windowWidth`/`windowHeight` from `capture_current_view`) |
 | `device` | string | `"touch"` | `"touch"` or `"mouse"` |
 | `dryRun` | boolean | `false` | If `true`, returns the preview screenshot without injecting |
 
@@ -730,8 +742,7 @@ Most input tools accept a `coordinateSpace` parameter:
 | Value | Description |
 |---|---|
 | `"normalized"` | **Default.** Values from `0.0` (top-left) to `1.0` (bottom-right), relative to the app window. Recommended for resolution-independent automation. |
-| `"client"` | Pixel coordinates relative to the app window's client area. |
-| `"absolute"` | Screen pixel coordinates. |
+| `"pixels"` | Render-pixel coordinates matching `windowWidth`/`windowHeight` from `capture_current_view`. Use when you have pixel positions from a screenshot or UI tree bounds. |
 
 **Converting screenshot pixels to normalized coordinates:**
 
@@ -751,7 +762,7 @@ Set `dryRun: true` on any input tool to get the preview without actually injecti
 ## Requirements & Limitations
 
 - **Developer Mode** must be enabled on the machine for input injection to work.
-- **Input injection** requires the `inputInjectionBrokered` restricted capability. If the Windows `InputInjector` API is unavailable, tap and drag tools fall back to Win32 `SendInput` via the FullTrust companion process. This fallback supports basic mouse clicks and drags but not touch, pen, gamepad, or multi-touch gestures.
+- **Input injection** requires the `inputInjectionBrokered` restricted capability. Without it, touch, pen, gamepad, and multi-touch injection will not work.
 - **Architecture must match the host machine.** The `InputInjector` COM component is native-only — it does not work under emulation. On ARM64 machines, you **must** set your Solution Platform to **ARM64** in Configuration Manager. Both **AnyCPU** and **x64** produce packages that Windows runs under x64 emulation on ARM64, causing `InputInjector.TryCreate()` to fail with `HRESULT 0x800700C1` ("is not a valid Win32 application"). When InputInjector is unavailable, tap and drag tools fall back to Win32 `SendInput` (mouse-only, no touch/pen/gamepad). See [Troubleshooting](#troubleshooting) for details.
 - The MCP server runs as a **FullTrust companion process** alongside your UWP app. Both processes must be running for tools to work.
 - The server listens on **localhost only** — remote connections require your own tunneling solution.
@@ -774,11 +785,9 @@ Set `dryRun: true` on any input tool to get the preview without actually injecti
 - Ensure Developer Mode is enabled (required by `InputInjector`).
 - The app window must be in the foreground — the companion server automatically brings it forward before injection.
 
-**InputInjector fails — `inject_tap` returns `device: "mouse"` instead of `device: "touch"`**
-- This means the UWP `InputInjector` could not initialize and the server fell back to Win32 `SendInput`.
-- **Most common cause:** architecture mismatch. On ARM64 machines, the `InputInjector` COM interface (`IInputInjectorStatics`) is native ARM64 only. If your app is built as **x64** or **AnyCPU**, Windows runs the UWP process under x64 emulation, and `InputInjector.TryCreate()` throws `InvalidCastException` with `HRESULT 0x800700C1` ("is not a valid Win32 application").
-- **Fix:** In Visual Studio Configuration Manager, set your Solution Platform to **ARM64** on ARM64 hardware. AnyCPU is not sufficient — UWP "neutral" packages run emulated on ARM64.
-- If your project doesn't have ARM64 in Configuration Manager, add it: Build → Configuration Manager → Active Solution Platform dropdown → New → ARM64.
+**InputInjector fails on ARM64**
+- On ARM64 machines, the `InputInjector` COM interface is native ARM64 only. If your app is built as **x64** or **AnyCPU**, Windows runs the UWP process under x64 emulation, and `InputInjector.TryCreate()` fails.
+- **Fix:** In Visual Studio Configuration Manager, set your Solution Platform to **ARM64** on ARM64 hardware.
 - Check the diagnostic log at startup: the MCP server logs `InputInjectionCapability: InputInjector not available` with the specific error when this occurs.
 
 **App crashes on launch**

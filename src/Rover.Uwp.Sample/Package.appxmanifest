@@ -67,6 +67,7 @@
     <Capability Name="privateNetworkClientServer" />
     <rescap:Capability Name="runFullTrust" />
     <rescap:Capability Name="inputInjectionBrokered" />
+    <rescap:Capability Name="inputInjection" />
   </Capabilities>
 
 </Package>

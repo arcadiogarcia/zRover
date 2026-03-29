@@ -38,6 +38,34 @@ namespace Rover.Uwp.Sample
 
             Rover.Uwp.RoverMcp.Log("MainPage", "MainPage initialized");
 
+            // Input diagnostics via Rover logging — visible in get_logs, helps diagnose
+            // injection misclicks without requiring further app changes.
+            var coreWindow = Windows.UI.Core.CoreWindow.GetForCurrentThread();
+            coreWindow.PointerPressed += (s, e) =>
+            {
+                var pt = e.CurrentPoint;
+                Rover.Uwp.RoverMcp.Log("MainPage.Input",
+                    $"PointerPressed type={pt.PointerDevice.PointerDeviceType} " +
+                    $"id={pt.PointerId} pos=({pt.Position.X:F1},{pt.Position.Y:F1}) " +
+                    $"primary={pt.Properties.IsPrimary}");
+            };
+            coreWindow.PointerReleased += (s, e) =>
+            {
+                var pt = e.CurrentPoint;
+                if (pt.PointerDevice.PointerDeviceType != Windows.Devices.Input.PointerDeviceType.Mouse)
+                    Rover.Uwp.RoverMcp.Log("MainPage.Input",
+                        $"PointerReleased type={pt.PointerDevice.PointerDeviceType} " +
+                        $"id={pt.PointerId} pos=({pt.Position.X:F1},{pt.Position.Y:F1})");
+            };
+
+            // Log window content size on load and resize — needed to interpret normalized coordinates.
+            this.Loaded += (s, e) =>
+                Rover.Uwp.RoverMcp.Log("MainPage.Layout",
+                    $"Content size: {ActualWidth:F0}x{ActualHeight:F0}");
+            this.SizeChanged += (s, e) =>
+                Rover.Uwp.RoverMcp.Log("MainPage.Layout",
+                    $"Size changed: {e.NewSize.Width:F0}x{e.NewSize.Height:F0}");
+
             // Track text changes for char count
             TestTextBox.TextChanged += TextBox_TextChanged;
             MultiLineTextBox.TextChanged += TextBox_TextChanged;

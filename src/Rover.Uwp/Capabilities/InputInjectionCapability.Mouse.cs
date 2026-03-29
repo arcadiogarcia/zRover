@@ -1,5 +1,6 @@
 using System;
 using Newtonsoft.Json;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Rover.Core;
 using Rover.Core.Coordinates;
@@ -15,7 +16,7 @@ namespace Rover.Uwp.Capabilities
   ""properties"": {
     ""x"": { ""type"": ""number"", ""description"": ""X coordinate where the scroll occurs."" },
     ""y"": { ""type"": ""number"", ""description"": ""Y coordinate where the scroll occurs."" },
-    ""coordinateSpace"": { ""type"": ""string"", ""enum"": [""absolute"", ""normalized"", ""client""], ""default"": ""normalized"" },
+    ""coordinateSpace"": { ""type"": ""string"", ""enum"": [""normalized"", ""pixels""], ""default"": ""normalized"" },
     ""deltaY"": { ""type"": ""integer"", ""default"": -120, ""description"": ""Vertical scroll amount. Negative scrolls down, positive scrolls up. 120 = one notch."" },
     ""deltaX"": { ""type"": ""integer"", ""default"": 0, ""description"": ""Horizontal scroll amount. Negative scrolls left, positive scrolls right. 120 = one notch."" },
     ""dryRun"": { ""type"": ""boolean"", ""default"": false, ""description"": ""If true, previews the scroll location without injecting."" }
@@ -28,7 +29,7 @@ namespace Rover.Uwp.Capabilities
   ""properties"": {
     ""x"": { ""type"": ""number"", ""description"": ""Target X coordinate."" },
     ""y"": { ""type"": ""number"", ""description"": ""Target Y coordinate."" },
-    ""coordinateSpace"": { ""type"": ""string"", ""enum"": [""absolute"", ""normalized"", ""client""], ""default"": ""normalized"" },
+    ""coordinateSpace"": { ""type"": ""string"", ""enum"": [""normalized"", ""pixels""], ""default"": ""normalized"" },
     ""dryRun"": { ""type"": ""boolean"", ""default"": false, ""description"": ""If true, previews the move target without injecting."" }
   },
   ""required"": [""x"", ""y""]
@@ -54,16 +55,47 @@ namespace Rover.Uwp.Capabilities
                 InjectMouseMoveAsync);
         }
 
+        // Win32 P/Invoke for virtual desktop metrics (needed for multi-monitor coordinate mapping).
+        [DllImport("user32.dll")]
+        private static extern int GetSystemMetrics(int nIndex);
+        private const int SM_XVIRTUALSCREEN  = 76;
+        private const int SM_YVIRTUALSCREEN  = 77;
+        private const int SM_CXVIRTUALSCREEN = 78;
+        private const int SM_CYVIRTUALSCREEN = 79;
+
+        /// <summary>
+        /// Converts a DIP screen-space point to the injection coordinate expected by
+        /// <see cref="InjectedInputPoint.PositionX"/>/<see cref="InjectedInputPoint.PositionY"/>
+        /// for touch and pen injection (physical pixels offset by virtual desktop origin).
+        /// </summary>
+        private (int x, int y) ToTouchInjectionPoint(double dipX, double dipY, double dpiScale)
+        {
+            int vLeft = GetSystemMetrics(SM_XVIRTUALSCREEN);
+            int vTop  = GetSystemMetrics(SM_YVIRTUALSCREEN);
+            return ((int)(dipX * dpiScale - vLeft), (int)(dipY * dpiScale - vTop));
+        }
+
+        /// <summary>
+        /// Converts a DIP screen-space point to the 0–65535 range expected by
+        /// <see cref="InjectedInputMouseOptions.Absolute"/> combined with
+        /// <see cref="InjectedInputMouseOptions.VirtualDesk"/>, so the result is
+        /// correct on any monitor in a multi-monitor setup.
+        /// </summary>
         private (int normX, int normY) ToMouseNormalized(CoordinatePoint dipPoint, double dpiScale)
         {
-            var dispInfo = Windows.Graphics.Display.DisplayInformation.GetForCurrentView();
-            double rawW = dispInfo.ScreenWidthInRawPixels;
-            double rawH = dispInfo.ScreenHeightInRawPixels;
-            double screenDipW = rawW / dpiScale;
-            double screenDipH = rawH / dpiScale;
+            // Convert DIP → raw physical pixels (DIP * dpiScale of the current display).
+            double rawX = dipPoint.X * dpiScale;
+            double rawY = dipPoint.Y * dpiScale;
 
-            int normX = (int)(dipPoint.X / screenDipW * 65535);
-            int normY = (int)(dipPoint.Y / screenDipH * 65535);
+            // Map into 0..65535 relative to the full virtual desktop so that
+            // InjectedInputMouseOptions.VirtualDesk places the cursor on the correct monitor.
+            int vLeft = GetSystemMetrics(SM_XVIRTUALSCREEN);
+            int vTop  = GetSystemMetrics(SM_YVIRTUALSCREEN);
+            int vW    = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+            int vH    = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+
+            int normX = vW > 0 ? (int)((rawX - vLeft) / vW * 65535) : 0;
+            int normY = vH > 0 ? (int)((rawY - vTop)  / vH * 65535) : 0;
             return (normX, normY);
         }
 
@@ -129,10 +161,12 @@ namespace Rover.Uwp.Capabilities
                     double dpiScale = dispInfo.RawPixelsPerViewPixel;
                     var (normX, normY) = ToMouseNormalized(resolved, dpiScale);
 
-                    // Move mouse to position
+                    // Move mouse to position (VirtualDesk ensures correct placement on any monitor)
                     injector.InjectMouseInput(new[] { new InjectedInputMouseInfo
                     {
-                        MouseOptions = InjectedInputMouseOptions.Move | InjectedInputMouseOptions.Absolute,
+                        MouseOptions = InjectedInputMouseOptions.Move
+                                     | InjectedInputMouseOptions.Absolute
+                                     | InjectedInputMouseOptions.VirtualDesk,
                         DeltaX = normX,
                         DeltaY = normY
                     }});
@@ -236,7 +270,9 @@ namespace Rover.Uwp.Capabilities
 
                     injector.InjectMouseInput(new[] { new InjectedInputMouseInfo
                     {
-                        MouseOptions = InjectedInputMouseOptions.Move | InjectedInputMouseOptions.Absolute,
+                        MouseOptions = InjectedInputMouseOptions.Move
+                                     | InjectedInputMouseOptions.Absolute
+                                     | InjectedInputMouseOptions.VirtualDesk,
                         DeltaX = normX,
                         DeltaY = normY
                     }});

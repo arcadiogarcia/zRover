@@ -171,10 +171,15 @@
        The server is published as a self-contained single-file, so we only need one exe.
        Pick win-arm64 when building for ARM64 (or AnyCPU on ARM64 host), otherwise win-x64. -->
   <PropertyGroup>
-    <_SampleHostArch>$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)</_SampleHostArch>
+    <!-- Derive RID from the build Platform, not the host OS architecture.
+         On ARM64 hosts building x64 (emulation), Platform=x64 so we want win-x64. -->
     <_FullTrustRid Condition="'$(Platform)' == 'ARM64'">win-arm64</_FullTrustRid>
-    <_FullTrustRid Condition="'$(Platform)' != 'ARM64' AND '$(_SampleHostArch)' == 'Arm64'">win-arm64</_FullTrustRid>
-    <_FullTrustRid Condition="'$(Platform)' != 'ARM64' AND '$(_SampleHostArch)' != 'Arm64'">win-x64</_FullTrustRid>
+    <_FullTrustRid Condition="'$(Platform)' == 'x64'">win-x64</_FullTrustRid>
+    <_FullTrustRid Condition="'$(Platform)' == 'x86'">win-x86</_FullTrustRid>
+    <!-- Fallback for AnyCPU: use host architecture -->
+    <_SampleHostArch Condition="'$(_FullTrustRid)' == ''">$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)</_SampleHostArch>
+    <_FullTrustRid Condition="'$(_FullTrustRid)' == '' AND '$(_SampleHostArch)' == 'Arm64'">win-arm64</_FullTrustRid>
+    <_FullTrustRid Condition="'$(_FullTrustRid)' == ''">win-x64</_FullTrustRid>
     <FullTrustPublishDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\Rover.FullTrust.McpServer\bin\$(Configuration)\net8.0-windows10.0.19041.0\$(_FullTrustRid)\publish\'))</FullTrustPublishDir>
   </PropertyGroup>
   <ItemGroup Condition="Exists('$(FullTrustPublishDir)Rover.FullTrust.McpServer.exe')">
@@ -199,18 +204,19 @@
   <Import Project="$(MSBuildExtensionsPath)\Microsoft\WindowsXaml\v$(VisualStudioVersion)\Microsoft.Windows.UI.Xaml.CSharp.targets" />
 
   <!--
-    Post-build: sync the complete FullTrust publish output into the AppX\FullTrust layout
-    folder so that VS F5 / loose-file deployment has all dependencies alongside the .exe.
-    The UWP build system only copies the .exe launcher; everything else (the .dll entry-
-    point, runtimeconfig, third-party assemblies) must be placed here explicitly.
+    Inject the complete FullTrust build output into AppxPackagePayload — the official
+    UWP payload extensibility point — so that both VS Build and VS Deploy copy the files
+    into AppX\FullTrust\ automatically.  The UWP build system only carries the .exe
+    launcher; everything else (.dll entry-point, runtimeconfig, third-party assemblies)
+    must be registered here so the appxrecipe covers them.
   -->
-  <Target Name="SyncFullTrustToAppX" AfterTargets="Build">
+  <Target Name="_AddFullTrustToPayload" BeforeTargets="_ComputeAppxPackagePayload">
     <ItemGroup>
-      <FullTrustFiles Include="$(MSBuildThisFileDirectory)..\Rover.FullTrust.McpServer\bin\$(Configuration)\net8.0-windows10.0.19041.0\**\*" />
+      <_FullTrustFiles Include="$(MSBuildThisFileDirectory)..\Rover.FullTrust.McpServer\bin\$(Configuration)\net8.0-windows10.0.19041.0\**\*" />
+      <AppxPackagePayload Include="@(_FullTrustFiles)">
+        <TargetPath>FullTrust\%(RecursiveDir)%(Filename)%(Extension)</TargetPath>
+      </AppxPackagePayload>
     </ItemGroup>
-    <Copy SourceFiles="@(FullTrustFiles)"
-          DestinationFiles="@(FullTrustFiles->'$(OutputPath)AppX\FullTrust\%(RecursiveDir)%(Filename)%(Extension)')"
-          SkipUnchangedFiles="true" />
   </Target>
 
 </Project>

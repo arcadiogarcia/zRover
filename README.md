@@ -10,7 +10,7 @@ Install the NuGet package and integrate in three lines of code:
 dotnet add package Rover.Uwp --prerelease
 ```
 
-See the **[Integration Guide](docs/integration-guide.md)** for complete setup instructions, manifest configuration, MCP client setup for VS Code / Claude / Cursor / Windsurf, the full tool reference (21 tools), and troubleshooting.
+See the **[Integration Guide](docs/integration-guide.md)** for complete setup instructions, manifest configuration, MCP client setup for VS Code / Claude / Cursor / Windsurf, the full tool reference (22 tools), and troubleshooting.
 
 ## Connect an MCP Client
 
@@ -77,7 +77,7 @@ MCP Client (tests, AI agents, etc.)
 
 ## MCP Tools
 
-Rover exposes **21 tools** across screenshot capture, touch/mouse, keyboard, pen, gamepad input, app-defined action dispatch, diagnostic logging, XAML UI tree inspection, window management, and condition polling. All input tools use normalized coordinates (0.0–1.0) by default.
+Rover exposes **22 tools** across screenshot capture, touch/mouse, keyboard, pen, gamepad input, app-defined action dispatch, diagnostic logging, XAML UI tree inspection, window management, and condition polling. All input tools use normalized coordinates (0.0–1.0) by default.
 
 See the **[full tool reference](docs/integration-guide.md#available-tools)** for parameters, coordinate spaces, and dry-run preview support.
 

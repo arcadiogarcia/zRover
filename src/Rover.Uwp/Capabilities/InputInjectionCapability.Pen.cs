@@ -17,7 +17,7 @@ namespace Rover.Uwp.Capabilities
   ""properties"": {
     ""x"": { ""type"": ""number"", ""description"": ""X coordinate of the pen tap."" },
     ""y"": { ""type"": ""number"", ""description"": ""Y coordinate of the pen tap."" },
-    ""coordinateSpace"": { ""type"": ""string"", ""enum"": [""absolute"", ""normalized"", ""client""], ""default"": ""normalized"" },
+    ""coordinateSpace"": { ""type"": ""string"", ""enum"": [""normalized"", ""pixels""], ""default"": ""normalized"" },
     ""pressure"": { ""type"": ""number"", ""default"": 0.5, ""description"": ""Pen pressure 0.0 to 1.0."" },
     ""tiltX"": { ""type"": ""integer"", ""default"": 0, ""description"": ""Pen X tilt in degrees (-90 to 90)."" },
     ""tiltY"": { ""type"": ""integer"", ""default"": 0, ""description"": ""Pen Y tilt in degrees (-90 to 90)."" },
@@ -50,7 +50,7 @@ namespace Rover.Uwp.Capabilities
       ""minItems"": 2,
       ""description"": ""Ordered points for the pen stroke.""
     },
-    ""coordinateSpace"": { ""type"": ""string"", ""enum"": [""absolute"", ""normalized"", ""client""], ""default"": ""normalized"" },
+    ""coordinateSpace"": { ""type"": ""string"", ""enum"": [""normalized"", ""pixels""], ""default"": ""normalized"" },
     ""pressure"": { ""type"": ""number"", ""default"": 0.5, ""description"": ""Default pressure for all points."" },
     ""tiltX"": { ""type"": ""integer"", ""default"": 0 },
     ""tiltY"": { ""type"": ""integer"", ""default"": 0 },
@@ -149,14 +149,14 @@ namespace Rover.Uwp.Capabilities
                     resolved = _resolver!.Resolve(new CoordinatePoint(req.X, req.Y), space);
                     var dispInfo = Windows.Graphics.Display.DisplayInformation.GetForCurrentView();
                     double dpiScale = dispInfo.RawPixelsPerViewPixel;
-                    int rawX = (int)(resolved.X * dpiScale);
-                    int rawY = (int)(resolved.Y * dpiScale);
+                    var (rawX, rawY) = ToTouchInjectionPoint(resolved.X, resolved.Y, dpiScale);
 
                     var penButtons = BuildPenButtons(req.Barrel, req.Eraser);
                     var pointerDown = req.Hover
                         ? InjectedInputPointerOptions.InRange | InjectedInputPointerOptions.New
                         : InjectedInputPointerOptions.PointerDown | InjectedInputPointerOptions.InRange
-                          | InjectedInputPointerOptions.InContact | InjectedInputPointerOptions.New;
+                          | InjectedInputPointerOptions.InContact | InjectedInputPointerOptions.New
+                          | InjectedInputPointerOptions.Primary;
 
                     var penParams = InjectedInputPenParameters.Pressure
                                   | InjectedInputPenParameters.Rotation
@@ -308,8 +308,7 @@ namespace Rover.Uwp.Capabilities
             // Resolve first point
             var firstPt = req.Points[0];
             var firstResolved = _resolver!.Resolve(new CoordinatePoint(firstPt.X, firstPt.Y), space);
-            int firstRawX = (int)(firstResolved.X * dpiScale);
-            int firstRawY = (int)(firstResolved.Y * dpiScale);
+            var (firstRawX, firstRawY) = ToTouchInjectionPoint(firstResolved.X, firstResolved.Y, dpiScale);
 
             // Pen down
             injector.InjectPenInput(new InjectedInputPenInfo
@@ -320,7 +319,8 @@ namespace Rover.Uwp.Capabilities
                     PointerOptions = InjectedInputPointerOptions.PointerDown
                                    | InjectedInputPointerOptions.InRange
                                    | InjectedInputPointerOptions.InContact
-                                   | InjectedInputPointerOptions.New,
+                                   | InjectedInputPointerOptions.New
+                                   | InjectedInputPointerOptions.Primary,
                     PixelLocation = new InjectedInputPoint { PositionX = firstRawX, PositionY = firstRawY }
                 },
                 Pressure = firstPt.Pressure ?? req.Pressure,
@@ -340,8 +340,7 @@ namespace Rover.Uwp.Capabilities
 
                 var pt = req.Points[i];
                 var resolved = _resolver!.Resolve(new CoordinatePoint(pt.X, pt.Y), space);
-                int rawX = (int)(resolved.X * dpiScale);
-                int rawY = (int)(resolved.Y * dpiScale);
+                var (rawX, rawY) = ToTouchInjectionPoint(resolved.X, resolved.Y, dpiScale);
 
                 injector.InjectPenInput(new InjectedInputPenInfo
                 {
@@ -365,8 +364,7 @@ namespace Rover.Uwp.Capabilities
             // Pen up at last point
             var lastPt = req.Points[req.Points.Count - 1];
             var lastResolved = _resolver!.Resolve(new CoordinatePoint(lastPt.X, lastPt.Y), space);
-            int lastRawX = (int)(lastResolved.X * dpiScale);
-            int lastRawY = (int)(lastResolved.Y * dpiScale);
+            var (lastRawX, lastRawY) = ToTouchInjectionPoint(lastResolved.X, lastResolved.Y, dpiScale);
 
             System.Threading.Thread.Sleep(delayPerPoint);
             injector.InjectPenInput(new InjectedInputPenInfo

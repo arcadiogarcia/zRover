@@ -65,10 +65,12 @@ namespace Rover.Uwp.Capabilities
         {
             registry.RegisterTool(
                 "capture_current_view",
-                "Captures the current app window as a PNG screenshot and returns its file path and dimensions (in render pixels). " +
-                "To convert a screenshot pixel position (px, py) to normalized coordinates for inject_tap/inject_drag_path: x = px / width, y = py / height. " +
-                "For example, if the screenshot is 1024×768 and you want to tap at pixel (512, 384), use normalized (0.5, 0.5). " +
-                "Do NOT pass raw pixel values to injection tools — always divide by the screenshot dimensions first. " +
+                "Captures the current app window as a PNG screenshot. " +
+                "Returns bitmapWidth/bitmapHeight (the returned image dimensions, may be smaller if maxWidth/maxHeight was applied) " +
+                "and windowWidth/windowHeight (the full render-pixel size of the window before any resize constraint). " +
+                "Use windowWidth/windowHeight as the coordinate space for coordinateSpace='pixels' injection. " +
+                "To convert a pixel position (px, py) in the bitmap to normalized coordinates: x = px / bitmapWidth, y = py / bitmapHeight. " +
+                "To use pixels directly with injection: scale by windowWidth/bitmapWidth first if the bitmap was resized. " +
                 "If you are unsure about precise element positions, use capture_region to zoom into a smaller area and verify before interacting.",
                 CaptureSchema,
                 CaptureAsync);
@@ -93,7 +95,9 @@ namespace Rover.Uwp.Capabilities
                 "(5) If needed, adjust and capture again. (6) Once confident, use inject_tap or inject_drag_path with the confirmed coordinates. " +
                 "COORDINATE CONVERSION: The response includes fullWidth/fullHeight (the full screenshot dimensions) and the normalizedRegion you requested. " +
                 "To convert a pixel position (px, py) within the cropped image to normalized coordinates for injection: " +
-                "normalizedX = region.x + (px / fullWidth), normalizedY = region.y + (py / fullHeight).",
+                "normalizedX = region.x + (px / windowWidth), normalizedY = region.y + (py / windowHeight), " +
+                "where windowWidth/windowHeight are from capture_current_view.",
+
                 RegionSchema,
                 CaptureRegionAsync);
         }
@@ -123,6 +127,9 @@ namespace Rover.Uwp.Capabilities
                 if (bitmap == null)
                     throw new InvalidOperationException("Capture returned no frame.");
 
+                int windowWidth  = bitmap.PixelWidth;
+                int windowHeight = bitmap.PixelHeight;
+
                 bitmap = await ScreenshotAnnotator.ResizeBitmapAsync(bitmap, maxW, maxH).ConfigureAwait(false);
 
                 var storageFile = await ScreenshotAnnotator.SaveScreenshotAsync(bitmap, "frame").ConfigureAwait(false);
@@ -131,8 +138,10 @@ namespace Rover.Uwp.Capabilities
                 {
                     Success = true,
                     FilePath = storageFile.Path,
-                    Width = bitmap.PixelWidth,
-                    Height = bitmap.PixelHeight
+                    BitmapWidth  = bitmap.PixelWidth,
+                    BitmapHeight = bitmap.PixelHeight,
+                    WindowWidth  = windowWidth,
+                    WindowHeight = windowHeight
                 };
                 return JsonConvert.SerializeObject(response);
             }

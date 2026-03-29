@@ -5,6 +5,7 @@ using Newtonsoft.Json;
 using System.Threading.Tasks;
 using Rover.Core;
 using Rover.Core.Coordinates;
+using Rover.Core.Logging;
 using Rover.Core.Tools.InputInjection;
 using Windows.Foundation;
 using Windows.UI.Input.Preview.Injection;
@@ -63,7 +64,7 @@ namespace Rover.Uwp.Capabilities
   ""properties"": {
     ""x"": { ""type"": ""number"", ""description"": ""X coordinate. In the default normalized space this is 0.0 (left) to 1.0 (right)."" },
     ""y"": { ""type"": ""number"", ""description"": ""Y coordinate. In the default normalized space this is 0.0 (top) to 1.0 (bottom)."" },
-    ""coordinateSpace"": { ""type"": ""string"", ""enum"": [""absolute"", ""normalized"", ""client""], ""default"": ""normalized"", ""description"": ""Coordinate space: 'normalized' (default, 0-1 relative to app window), 'client' (window pixels), or 'absolute' (screen pixels)."" },
+    ""coordinateSpace"": { ""type"": ""string"", ""enum"": [""normalized"", ""pixels""], ""default"": ""normalized"", ""description"": ""Coordinate space: 'normalized' (default, 0.0-1.0 relative to window size) or 'pixels' (render pixels, matching windowWidth/windowHeight from capture_current_view)."" },
     ""device"": { ""type"": ""string"", ""enum"": [""touch"", ""mouse""], ""default"": ""touch"" },
     ""dryRun"": { ""type"": ""boolean"", ""default"": false, ""description"": ""If true, captures an annotated screenshot showing where the tap would land but does NOT actually inject the input. Use this to verify coordinates before committing."" }
   },
@@ -75,7 +76,7 @@ namespace Rover.Uwp.Capabilities
   ""properties"": {
     ""points"": { ""type"": ""array"", ""items"": { ""$ref"": ""#/$defs/point"" }, ""minItems"": 2, ""description"": ""Ordered waypoints for the drag gesture."" },
     ""durationMs"": { ""type"": ""integer"", ""default"": 300, ""description"": ""Total duration of the drag in milliseconds."" },
-    ""coordinateSpace"": { ""type"": ""string"", ""enum"": [""absolute"", ""normalized"", ""client""], ""default"": ""normalized"", ""description"": ""Coordinate space: 'normalized' (default, 0-1 relative to app window), 'client' (window pixels), or 'absolute' (screen pixels)."" },
+    ""coordinateSpace"": { ""type"": ""string"", ""enum"": [""normalized"", ""pixels""], ""default"": ""normalized"", ""description"": ""Coordinate space: 'normalized' (default, 0.0-1.0 relative to window size) or 'pixels' (render pixels, matching windowWidth/windowHeight from capture_current_view)."" },
     ""device"": { ""type"": ""string"", ""enum"": [""touch"", ""mouse""], ""default"": ""touch"" },
     ""dryRun"": { ""type"": ""boolean"", ""default"": false, ""description"": ""If true, captures an annotated screenshot showing the drag path but does NOT actually inject the input. Use this to verify the path before committing."" }
   },
@@ -149,7 +150,7 @@ namespace Rover.Uwp.Capabilities
                 "Returns an annotated screenshot showing the tap location BEFORE the input is injected, " +
                 "so you can verify the target. The crosshair marker is drawn with contrasting colors for visibility. " +
                 "Set dryRun=true to preview the tap location without actually injecting input. " +
-                "Coordinates default to normalized space (0.0–1.0 relative to the app window), where (0,0) is the top-left corner and (1,1) is the bottom-right. " +
+                "Use coordinateSpace='normalized' (default, 0.0-1.0 relative to window) or 'pixels' (render pixels matching windowWidth/windowHeight from capture_current_view). " +
                 "Use capture_current_view first to see the UI layout.",
                 TapSchema,
                 InjectTapAsync);
@@ -160,7 +161,7 @@ namespace Rover.Uwp.Capabilities
                 "Returns an annotated screenshot showing the drag path BEFORE the input is injected, " +
                 "with the start point (green circle), path (cyan line), waypoints (yellow dots), and end point (red diamond) visualized. " +
                 "Set dryRun=true to preview the drag path without actually injecting input. " +
-                "Coordinates default to normalized space (0.0–1.0 relative to the app window), where (0,0) is the top-left corner and (1,1) is the bottom-right. " +
+                "Use coordinateSpace='normalized' (default, 0.0-1.0 relative to window) or 'pixels' (render pixels matching windowWidth/windowHeight from capture_current_view). " +
                 "Use capture_current_view first to see the UI layout.",
                 DragSchema,
                 InjectDragPathAsync);
@@ -197,10 +198,30 @@ namespace Rover.Uwp.Capabilities
             // If dry run, return preview without injecting
             if (req.DryRun)
             {
+                // Resolve coordinates so the response reflects true screen-space position.
+                CoordinatePoint dryResolved;
+                try
+                {
+                    string? dryResolvedResult = null;
+                    await (_runOnUiThread?.Invoke(() =>
+                    {
+                        var space = ParseSpace(req.CoordinateSpace);
+                        dryResolvedResult = JsonConvert.SerializeObject(_resolver!.Resolve(new CoordinatePoint(req.X, req.Y), space));
+                        return Task.CompletedTask;
+                    }) ?? Task.CompletedTask).ConfigureAwait(false);
+                    dryResolved = dryResolvedResult != null
+                        ? JsonConvert.DeserializeObject<CoordinatePoint>(dryResolvedResult)
+                        : new CoordinatePoint(req.X, req.Y);
+                }
+                catch
+                {
+                    dryResolved = new CoordinatePoint(req.X, req.Y);
+                }
+
                 var dryResponse = new InjectTapResponse
                 {
                     Success = true,
-                    ResolvedCoordinates = new CoordinatePoint(req.X, req.Y),
+                    ResolvedCoordinates = dryResolved,
                     Device = req.Device,
                     DryRun = true,
                     PreviewScreenshotPath = previewPath
@@ -212,31 +233,129 @@ namespace Rover.Uwp.Capabilities
             var injector = _injector;
             if (injector != null && _runOnUiThread != null)
             {
+                var useTouch = !string.Equals(req.Device, "mouse", StringComparison.OrdinalIgnoreCase);
                 try
                 {
-                    string? result = null;
-                    Exception? innerEx = null;
-                    await _runOnUiThread(() =>
+                    if (useTouch)
                     {
-                        try
-                        {
-                            result = InjectTapViaInjector(injector, req);
-                        }
-                        catch (Exception ex)
-                        {
-                            innerEx = ex;
-                        }
-                        return Task.CompletedTask;
-                    }).ConfigureAwait(false);
+                        // Touch tap: dispatch Down on UI thread, await 80ms, then dispatch Up in a
+                        // second UI-thread turn. InitializeTouchInjection makes a synchronous RPC so
+                        // it must NOT be followed by Thread.Sleep (would deadlock the message pump).
+                        CoordinatePoint resolved = new CoordinatePoint(req.X, req.Y);
+                        int touchX = 0, touchY = 0;
+                        Exception? innerEx = null;
 
-                    if (result != null)
-                    {
-                        LogToFile($"InputInjector tap succeeded");
-                        return AttachPreviewPath(result, previewPath);
+                        await _runOnUiThread(() =>
+                        {
+                            try
+                            {
+                                try { Windows.UI.Xaml.Window.Current?.Activate(); } catch { }
+                                var space = ParseSpace(req.CoordinateSpace);
+
+                                var wc = Windows.UI.Xaml.Window.Current?.Content as Windows.UI.Xaml.FrameworkElement;
+                                var cwBounds = Windows.UI.Core.CoreWindow.GetForCurrentThread()?.Bounds;
+                                var dispInfoDiag = Windows.Graphics.Display.DisplayInformation.GetForCurrentView();
+                                var resolverMsg = $"Inject context: contentW={wc?.ActualWidth:F1} contentH={wc?.ActualHeight:F1} " +
+                                                  $"bounds=({cwBounds?.X:F1},{cwBounds?.Y:F1} {cwBounds?.Width:F1}x{cwBounds?.Height:F1}) " +
+                                                  $"dpi={dispInfoDiag.RawPixelsPerViewPixel}";
+                                LogToFile(resolverMsg);
+
+                                resolved = _resolver!.Resolve(new CoordinatePoint(req.X, req.Y), space);
+                                var dispInfo = Windows.Graphics.Display.DisplayInformation.GetForCurrentView();
+                                double dpiScale = dispInfo.RawPixelsPerViewPixel;
+
+                                (touchX, touchY) = ToTouchInjectionPoint(resolved.X, resolved.Y, dpiScale);
+                                LogToFile($"Tap DIP=({resolved.X:F1},{resolved.Y:F1}) inject=({touchX},{touchY}) dpi={dpiScale}");
+
+                                var contact = new InjectedInputRectangle { Top = -8, Bottom = 8, Left = -8, Right = 8 };
+                                var location = new InjectedInputPoint { PositionX = touchX, PositionY = touchY };
+
+                                injector.InitializeTouchInjection(InjectedInputVisualizationMode.Default);
+                                injector.InjectTouchInput(new[] { new InjectedInputTouchInfo
+                                {
+                                    Contact = contact,
+                                    PointerInfo = new InjectedInputPointerInfo
+                                    {
+                                        PointerId = 1,
+                                        PointerOptions = InjectedInputPointerOptions.PointerDown
+                                                       | InjectedInputPointerOptions.InRange
+                                                       | InjectedInputPointerOptions.InContact
+                                                       | InjectedInputPointerOptions.New
+                                                       | InjectedInputPointerOptions.Primary,
+                                        PixelLocation = location
+                                    },
+                                    Pressure = 1.0,
+                                    TouchParameters = InjectedInputTouchParameters.Pressure | InjectedInputTouchParameters.Contact
+                                }});
+                                LogToFile("Touch PointerDown injected");
+                            }
+                            catch (Exception ex) { innerEx = ex; }
+                            return Task.CompletedTask;
+                        }).ConfigureAwait(false);
+
+                        if (innerEx == null)
+                        {
+                            // Let the input system process PointerDown before sending PointerUp.
+                            await Task.Delay(80).ConfigureAwait(false);
+
+                            await _runOnUiThread(() =>
+                            {
+                                try
+                                {
+                                    var contact = new InjectedInputRectangle { Top = -8, Bottom = 8, Left = -8, Right = 8 };
+                                    var location = new InjectedInputPoint { PositionX = touchX, PositionY = touchY };
+                                    injector.InjectTouchInput(new[] { new InjectedInputTouchInfo
+                                    {
+                                        Contact = contact,
+                                        PointerInfo = new InjectedInputPointerInfo
+                                        {
+                                            PointerId = 1,
+                                            PointerOptions = InjectedInputPointerOptions.PointerUp,
+                                            PixelLocation = location
+                                        },
+                                        Pressure = 0.0,
+                                        TouchParameters = InjectedInputTouchParameters.Pressure | InjectedInputTouchParameters.Contact
+                                    }});
+                                    injector.UninitializeTouchInjection();
+                                    LogToFile("Touch PointerUp injected");
+                                }
+                                catch (Exception ex) { innerEx = ex; }
+                                return Task.CompletedTask;
+                            }).ConfigureAwait(false);
+                        }
+
+                        if (innerEx != null)
+                            LogToFile($"Touch tap FAILED: {innerEx.GetType().FullName}: {innerEx.Message}");
+                        else
+                            LogToFile("InputInjector tap succeeded");
+
+                        return AttachPreviewPath(JsonConvert.SerializeObject(new InjectTapResponse
+                        {
+                            Success = innerEx == null,
+                            ResolvedCoordinates = resolved,
+                            Device = req.Device,
+                            PreviewScreenshotPath = previewPath
+                        }), previewPath);
                     }
-                    if (innerEx != null)
+                    else
                     {
-                        LogToFile($"InputInjector tap FAILED: {innerEx.GetType().FullName}: {innerEx.Message} HRESULT=0x{innerEx.HResult:X8}");
+                        // Mouse tap: handled synchronously on UI thread.
+                        string? result = null;
+                        Exception? innerEx = null;
+                        await _runOnUiThread(() =>
+                        {
+                            try { result = InjectTapViaInjector(injector, req); }
+                            catch (Exception ex) { innerEx = ex; }
+                            return Task.CompletedTask;
+                        }).ConfigureAwait(false);
+
+                        if (result != null)
+                        {
+                            LogToFile("InputInjector tap succeeded");
+                            return AttachPreviewPath(result, previewPath);
+                        }
+                        if (innerEx != null)
+                            LogToFile($"InputInjector tap FAILED: {innerEx.GetType().FullName}: {innerEx.Message} HRESULT=0x{innerEx.HResult:X8}");
                     }
                 }
                 catch (Exception ex)
@@ -271,87 +390,26 @@ namespace Rover.Uwp.Capabilities
 
             LogToFile($"Tap DIP=({resolved.X:F1},{resolved.Y:F1}) RAW=({rawX:F0},{rawY:F0}) dpi={dpiScale}");
 
-            var useTouch = !string.Equals(req.Device, "mouse", StringComparison.OrdinalIgnoreCase);
+            // Mouse path only — touch is handled asynchronously in InjectTapAsync.
+            var (normX, normY) = ToMouseNormalized(resolved, dpiScale);
 
-            if (!useTouch)
+            injector.InjectMouseInput(new[] { new InjectedInputMouseInfo
             {
-                // Mouse: 0-65535 normalized virtual screen coords
-                double rawW = dispInfo.ScreenWidthInRawPixels;
-                double rawH = dispInfo.ScreenHeightInRawPixels;
-                double screenDipW = rawW / dpiScale;
-                double screenDipH = rawH / dpiScale;
-
-                int normX = (int)(resolved.X / screenDipW * 65535);
-                int normY = (int)(resolved.Y / screenDipH * 65535);
-
-                injector.InjectMouseInput(new[] { new InjectedInputMouseInfo
-                {
-                    MouseOptions = InjectedInputMouseOptions.Move | InjectedInputMouseOptions.Absolute,
-                    DeltaX = normX, DeltaY = normY
-                }});
-                System.Threading.Thread.Sleep(50);
-                injector.InjectMouseInput(new[] { new InjectedInputMouseInfo
-                {
-                    MouseOptions = InjectedInputMouseOptions.LeftDown
-                }});
-                System.Threading.Thread.Sleep(50);
-                injector.InjectMouseInput(new[] { new InjectedInputMouseInfo
-                {
-                    MouseOptions = InjectedInputMouseOptions.LeftUp
-                }});
-            }
-            else
+                MouseOptions = InjectedInputMouseOptions.Move
+                             | InjectedInputMouseOptions.Absolute
+                             | InjectedInputMouseOptions.VirtualDesk,
+                DeltaX = normX, DeltaY = normY
+            }});
+            System.Threading.Thread.Sleep(50);
+            injector.InjectMouseInput(new[] { new InjectedInputMouseInfo
             {
-                // InjectedInputPoint.PositionX/Y expects RAW SCREEN PIXELS, not DIPs
-                int touchX = (int)rawX;
-                int touchY = (int)rawY;
-                LogToFile($"Touch injection at raw pixels ({touchX},{touchY})");
-
-                injector.InitializeTouchInjection(InjectedInputVisualizationMode.Default);
-
-                var info = new InjectedInputTouchInfo
-                {
-                    Contact = new InjectedInputRectangle { Top = -1, Bottom = 1, Left = -1, Right = 1 },
-                    PointerInfo = new InjectedInputPointerInfo
-                    {
-                        PointerId = 1,
-                        PointerOptions = InjectedInputPointerOptions.PointerDown
-                                       | InjectedInputPointerOptions.InContact
-                                       | InjectedInputPointerOptions.New,
-                        PixelLocation = new InjectedInputPoint
-                        {
-                            PositionX = touchX,
-                            PositionY = touchY
-                        },
-                    },
-                    Pressure = 1.0,
-                    TouchParameters = InjectedInputTouchParameters.Pressure
-                                    | InjectedInputTouchParameters.Contact
-                };
-
-                injector.InjectTouchInput(new[] { info });
-
-                var liftInfo = new InjectedInputTouchInfo
-                {
-                    Contact = new InjectedInputRectangle { Top = -1, Bottom = 1, Left = -1, Right = 1 },
-                    PointerInfo = new InjectedInputPointerInfo
-                    {
-                        PointerId = 1,
-                        PointerOptions = InjectedInputPointerOptions.PointerUp,
-                        PixelLocation = new InjectedInputPoint
-                        {
-                            PositionX = touchX,
-                            PositionY = touchY
-                        },
-                    },
-                    Pressure = 0.0,
-                    TouchParameters = InjectedInputTouchParameters.Pressure
-                                    | InjectedInputTouchParameters.Contact
-                };
-                injector.InjectTouchInput(new[] { liftInfo });
-
-                injector.UninitializeTouchInjection();
-            }
+                MouseOptions = InjectedInputMouseOptions.LeftDown
+            }});
+            System.Threading.Thread.Sleep(50);
+            injector.InjectMouseInput(new[] { new InjectedInputMouseInfo
+            {
+                MouseOptions = InjectedInputMouseOptions.LeftUp
+            }});
 
             var response = new InjectTapResponse
             {
@@ -480,11 +538,10 @@ namespace Rover.Uwp.Capabilities
 
             if (useTouch)
             {
-                // Touch drag: dispatch each event on UI thread with async waits between,
-                // allowing the UI thread to process each touch event as it arrives.
-                int startRawX = (int)(allPoints[0].X * dpiScale);
-                int startRawY = (int)(allPoints[0].Y * dpiScale);
-                LogToFile($"Touch drag start at raw ({startRawX},{startRawY})");
+                // Touch drag: dispatch each event on UI thread with async waits between.
+                // InjectedInputPoint uses physical pixels offset by virtual desktop origin.
+                var (startRawX, startRawY) = ToTouchInjectionPoint(allPoints[0].X, allPoints[0].Y, dpiScale);
+                LogToFile($"Touch drag start inject=({startRawX},{startRawY}) dpi={dpiScale}");
 
                 await _runOnUiThread!(() =>
                 {
@@ -496,8 +553,10 @@ namespace Rover.Uwp.Capabilities
                         {
                             PointerId = 1,
                             PointerOptions = InjectedInputPointerOptions.PointerDown
+                                           | InjectedInputPointerOptions.InRange
                                            | InjectedInputPointerOptions.InContact
-                                           | InjectedInputPointerOptions.New,
+                                           | InjectedInputPointerOptions.New
+                                           | InjectedInputPointerOptions.Primary,
                             PixelLocation = new InjectedInputPoint { PositionX = startRawX, PositionY = startRawY }
                         },
                         Pressure = 1.0,
@@ -509,8 +568,7 @@ namespace Rover.Uwp.Capabilities
                 for (int i = 1; i < allPoints.Count; i++)
                 {
                     await Task.Delay(delayPerPoint).ConfigureAwait(false);
-                    int rawX = (int)(allPoints[i].X * dpiScale);
-                    int rawY = (int)(allPoints[i].Y * dpiScale);
+                    var (rawX, rawY) = ToTouchInjectionPoint(allPoints[i].X, allPoints[i].Y, dpiScale);
                     await _runOnUiThread!(() =>
                     {
                         injector.InjectTouchInput(new[] { new InjectedInputTouchInfo
@@ -519,7 +577,8 @@ namespace Rover.Uwp.Capabilities
                             PointerInfo = new InjectedInputPointerInfo
                             {
                                 PointerId = 1,
-                                PointerOptions = InjectedInputPointerOptions.InContact,
+                                PointerOptions = InjectedInputPointerOptions.InContact
+                                               | InjectedInputPointerOptions.Update,
                                 PixelLocation = new InjectedInputPoint { PositionX = rawX, PositionY = rawY }
                             },
                             Pressure = 1.0,
@@ -529,9 +588,8 @@ namespace Rover.Uwp.Capabilities
                     }).ConfigureAwait(false);
                 }
 
-                int endRawX = (int)(allPoints[allPoints.Count - 1].X * dpiScale);
-                int endRawY = (int)(allPoints[allPoints.Count - 1].Y * dpiScale);
-                LogToFile($"Touch drag end at raw ({endRawX},{endRawY})");
+                var (endRawX, endRawY) = ToTouchInjectionPoint(allPoints[allPoints.Count - 1].X, allPoints[allPoints.Count - 1].Y, dpiScale);
+                LogToFile($"Touch drag end inject=({endRawX},{endRawY})");
 
                 await _runOnUiThread!(() =>
                 {
@@ -553,20 +611,16 @@ namespace Rover.Uwp.Capabilities
             }
             else
             {
-                // Mouse drag with 0-65535 normalized coordinates
+                // Mouse drag with virtual-desktop-relative 0-65535 coordinates
                 await _runOnUiThread!(() =>
                 {
-                    var dispInfo2 = Windows.Graphics.Display.DisplayInformation.GetForCurrentView();
-                    double rawW = dispInfo2.ScreenWidthInRawPixels;
-                    double rawH = dispInfo2.ScreenHeightInRawPixels;
-                    double screenDipW = rawW / dpiScale;
-                    double screenDipH = rawH / dpiScale;
-
+                    var (normX, normY) = ToMouseNormalized(allPoints[0], dpiScale);
                     injector.InjectMouseInput(new[] { new InjectedInputMouseInfo
                     {
-                        MouseOptions = InjectedInputMouseOptions.Move | InjectedInputMouseOptions.Absolute,
-                        DeltaX = (int)(allPoints[0].X / screenDipW * 65535),
-                        DeltaY = (int)(allPoints[0].Y / screenDipH * 65535)
+                        MouseOptions = InjectedInputMouseOptions.Move
+                                     | InjectedInputMouseOptions.Absolute
+                                     | InjectedInputMouseOptions.VirtualDesk,
+                        DeltaX = normX, DeltaY = normY
                     }});
                     injector.InjectMouseInput(new[] { new InjectedInputMouseInfo
                     {
@@ -581,17 +635,13 @@ namespace Rover.Uwp.Capabilities
                     int idx = i;
                     await _runOnUiThread!(() =>
                     {
-                        var dispInfo2 = Windows.Graphics.Display.DisplayInformation.GetForCurrentView();
-                        double rawW = dispInfo2.ScreenWidthInRawPixels;
-                        double rawH = dispInfo2.ScreenHeightInRawPixels;
-                        double screenDipW = rawW / dpiScale;
-                        double screenDipH = rawH / dpiScale;
-
+                        var (normX, normY) = ToMouseNormalized(allPoints[idx], dpiScale);
                         injector.InjectMouseInput(new[] { new InjectedInputMouseInfo
                         {
-                            MouseOptions = InjectedInputMouseOptions.Move | InjectedInputMouseOptions.Absolute,
-                            DeltaX = (int)(allPoints[idx].X / screenDipW * 65535),
-                            DeltaY = (int)(allPoints[idx].Y / screenDipH * 65535)
+                            MouseOptions = InjectedInputMouseOptions.Move
+                                         | InjectedInputMouseOptions.Absolute
+                                         | InjectedInputMouseOptions.VirtualDesk,
+                            DeltaX = normX, DeltaY = normY
                         }});
                         return Task.CompletedTask;
                     }).ConfigureAwait(false);
@@ -635,20 +685,12 @@ namespace Rover.Uwp.Capabilities
 
                 // Convert coordinates to normalized if needed
                 var space = ParseSpace(req.CoordinateSpace);
-                if (space == CoordinateSpace.Client || space == CoordinateSpace.Absolute)
+                if (space == CoordinateSpace.Pixels)
                 {
-                    var bounds = Window.Current.Bounds;
-                    if (space == CoordinateSpace.Client)
-                    {
-                        normX = req.X / bounds.Width;
-                        normY = req.Y / bounds.Height;
-                    }
-                    else // Absolute
-                    {
-                        normX = (req.X - bounds.X) / bounds.Width;
-                        normY = (req.Y - bounds.Y) / bounds.Height;
-                    }
+                    normX = bitmap!.PixelWidth > 0 ? req.X / bitmap.PixelWidth : req.X;
+                    normY = bitmap!.PixelHeight > 0 ? req.Y / bitmap.PixelHeight : req.Y;
                 }
+                // Normalized: pass-through (already 0..1)
             }).ConfigureAwait(false);
 
             if (bitmap == null) return null;
@@ -682,20 +724,12 @@ namespace Rover.Uwp.Capabilities
                 {
                     double nx = pt.X;
                     double ny = pt.Y;
-                    if (space == CoordinateSpace.Client || space == CoordinateSpace.Absolute)
+                    if (space == CoordinateSpace.Pixels)
                     {
-                        var bounds = Window.Current.Bounds;
-                        if (space == CoordinateSpace.Client)
-                        {
-                            nx = pt.X / bounds.Width;
-                            ny = pt.Y / bounds.Height;
-                        }
-                        else
-                        {
-                            nx = (pt.X - bounds.X) / bounds.Width;
-                            ny = (pt.Y - bounds.Y) / bounds.Height;
-                        }
+                        nx = bitmap!.PixelWidth > 0 ? pt.X / bitmap.PixelWidth : pt.X;
+                        ny = bitmap!.PixelHeight > 0 ? pt.Y / bitmap.PixelHeight : pt.Y;
                     }
+                    // Normalized: pass-through (already 0..1)
                     normalizedPoints.Add((nx, ny));
                 }
             }).ConfigureAwait(false);
@@ -739,20 +773,12 @@ namespace Rover.Uwp.Capabilities
                     {
                         double nx = pt.X;
                         double ny = pt.Y;
-                        if (space == CoordinateSpace.Client || space == CoordinateSpace.Absolute)
+                        if (space == CoordinateSpace.Pixels)
                         {
-                            var bounds = Window.Current.Bounds;
-                            if (space == CoordinateSpace.Client)
-                            {
-                                nx = pt.X / bounds.Width;
-                                ny = pt.Y / bounds.Height;
-                            }
-                            else
-                            {
-                                nx = (pt.X - bounds.X) / bounds.Width;
-                                ny = (pt.Y - bounds.Y) / bounds.Height;
-                            }
+                            nx = bitmap!.PixelWidth > 0 ? pt.X / bitmap.PixelWidth : pt.X;
+                            ny = bitmap!.PixelHeight > 0 ? pt.Y / bitmap.PixelHeight : pt.Y;
                         }
+                        // Normalized: pass-through (already 0..1)
                         nPath.Add((nx, ny));
                     }
                     normalizedPaths.Add(nPath);
@@ -803,8 +829,7 @@ namespace Rover.Uwp.Capabilities
         private static CoordinateSpace ParseSpace(string? value) =>
             value?.ToLowerInvariant() switch
             {
-                "absolute" => CoordinateSpace.Absolute,
-                "client" => CoordinateSpace.Client,
+                "pixels" => CoordinateSpace.Pixels,
                 _ => CoordinateSpace.Normalized
             };
     }
