@@ -167,27 +167,10 @@
     <Content Include="Assets\Wide310x150Logo.scale-200.png" />
   </ItemGroup>
 
-  <!-- Include the published FullTrust MCP server exe in the AppX package.
-       The server is published as a self-contained single-file, so we only need one exe.
-       Pick win-arm64 when building for ARM64 (or AnyCPU on ARM64 host), otherwise win-x64. -->
+  <!-- ── FullTrust companion: paths ──────────────────────────────────── -->
   <PropertyGroup>
-    <!-- Derive RID from the build Platform, not the host OS architecture.
-         On ARM64 hosts building x64 (emulation), Platform=x64 so we want win-x64. -->
-    <_FullTrustRid Condition="'$(Platform)' == 'ARM64'">win-arm64</_FullTrustRid>
-    <_FullTrustRid Condition="'$(Platform)' == 'x64'">win-x64</_FullTrustRid>
-    <_FullTrustRid Condition="'$(Platform)' == 'x86'">win-x86</_FullTrustRid>
-    <!-- Fallback for AnyCPU: use host architecture -->
-    <_SampleHostArch Condition="'$(_FullTrustRid)' == ''">$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)</_SampleHostArch>
-    <_FullTrustRid Condition="'$(_FullTrustRid)' == '' AND '$(_SampleHostArch)' == 'Arm64'">win-arm64</_FullTrustRid>
-    <_FullTrustRid Condition="'$(_FullTrustRid)' == ''">win-x64</_FullTrustRid>
-    <FullTrustPublishDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\zRover.FullTrust.McpServer\bin\$(Configuration)\net8.0-windows10.0.19041.0\$(_FullTrustRid)\publish\'))</FullTrustPublishDir>
+    <FullTrustBuildDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\zRover.FullTrust.McpServer\bin\$(Configuration)\net8.0-windows10.0.19041.0\'))</FullTrustBuildDir>
   </PropertyGroup>
-  <ItemGroup Condition="Exists('$(FullTrustPublishDir)zRover.FullTrust.McpServer.exe')">
-    <Content Include="$(FullTrustPublishDir)zRover.FullTrust.McpServer.exe">
-      <Link>FullTrust\zRover.FullTrust.McpServer.exe</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
 
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest">
@@ -204,15 +187,36 @@
   <Import Project="$(MSBuildExtensionsPath)\Microsoft\WindowsXaml\v$(VisualStudioVersion)\Microsoft.Windows.UI.Xaml.CSharp.targets" />
 
   <!--
-    Inject the complete FullTrust build output into AppxPackagePayload — the official
-    UWP payload extensibility point — so that both VS Build and VS Deploy copy the files
-    into AppX\FullTrust\ automatically.  The UWP build system only carries the .exe
-    launcher; everything else (.dll entry-point, runtimeconfig, third-party assemblies)
-    must be registered here so the appxrecipe covers them.
+    ── FullTrust companion: auto-build & include ────────────────────────
+
+    We can't use <ProjectReference> across UWP → SDK-style .NET 8, so we
+    shell out to 'dotnet build' automatically, then:
+      * Copy output to AppX\FullTrust\ for VS F5 loose-layout debugging.
+      * Inject into AppxPackagePayload for .msix packaging.
   -->
+  <Target Name="_BuildFullTrustProject" BeforeTargets="PrepareForBuild">
+    <Exec Command="dotnet build &quot;$(MSBuildThisFileDirectory)..\zRover.FullTrust.McpServer\zRover.FullTrust.McpServer.csproj&quot; -c $(Configuration) --no-self-contained" />
+  </Target>
+
+  <!-- Copy FullTrust output into the AppX loose layout so F5 debugging works. -->
+  <Target Name="_CopyFullTrustToLayout"
+          AfterTargets="Build"
+          DependsOnTargets="_BuildFullTrustProject"
+          Condition="Exists('$(OutDir)AppX\AppxManifest.xml')">
+    <ItemGroup>
+      <_FTLayoutFiles Include="$(FullTrustBuildDir)**\*"
+                      Exclude="$(FullTrustBuildDir)**\*.pdb;$(FullTrustBuildDir)**\*.staticwebassets.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_FTLayoutFiles)"
+          DestinationFiles="@(_FTLayoutFiles->'$(OutDir)AppX\FullTrust\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Inject FullTrust output into the .msix payload for packaged deployment. -->
   <Target Name="_AddFullTrustToPayload" BeforeTargets="_ComputeAppxPackagePayload">
     <ItemGroup>
-      <_FullTrustFiles Include="$(MSBuildThisFileDirectory)..\zRover.FullTrust.McpServer\bin\$(Configuration)\net8.0-windows10.0.19041.0\**\*" />
+      <_FullTrustFiles Include="$(FullTrustBuildDir)**\*"
+                       Exclude="$(FullTrustBuildDir)**\*.pdb;$(FullTrustBuildDir)**\*.staticwebassets.*" />
       <AppxPackagePayload Include="@(_FullTrustFiles)">
         <TargetPath>FullTrust\%(RecursiveDir)%(Filename)%(Extension)</TargetPath>
       </AppxPackagePayload>
