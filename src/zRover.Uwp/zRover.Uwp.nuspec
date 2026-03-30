@@ -2,10 +2,12 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
   <metadata>
     <id>zRover.Uwp</id>
-    <version>0.7.0-preview</version>
+    <version>0.8.0-preview</version>
     <title>zRover - MCP Tools for UWP Apps</title>
     <authors>zRover Contributors</authors>
     <description>Add Model Context Protocol (MCP) tool endpoints to any UWP app. zRover exposes input injection, screenshot capture, coordinate validation, and app-defined action dispatch tools through a FullTrust companion MCP server, letting AI agents interact with your app's UI.
+
+New in 0.8.0: Low-level pointer tools — pointer_down, pointer_move, pointer_up — for stateful multi-finger touch and pen gestures spanning multiple MCP calls. Supports mixed touch+pen sessions.
 
 New in 0.5.0: App Action API — implement IActionableApp to expose your own app's operations as list_actions / dispatch_action MCP tools.
 
