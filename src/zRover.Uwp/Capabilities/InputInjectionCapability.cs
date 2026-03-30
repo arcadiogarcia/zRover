@@ -137,7 +137,11 @@ namespace zRover.Uwp.Capabilities
 
         public Task StopAsync()
         {
-            _injector?.UninitializeTouchInjection();
+            if (_injector != null)
+            {
+                ReleaseAllPointers(_injector);
+                try { _injector.UninitializeTouchInjection(); } catch { }
+            }
             _injector = null;
             return Task.CompletedTask;
         }
@@ -171,6 +175,7 @@ namespace zRover.Uwp.Capabilities
             RegisterTouchTools(registry);
             RegisterPenTools(registry);
             RegisterGamepadTools(registry);
+            RegisterPointerTools(registry);
         }
 
         private async Task<string> InjectTapAsync(string argsJson)

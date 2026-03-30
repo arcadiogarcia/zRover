@@ -129,6 +129,7 @@
     <Compile Include="Capabilities\InputInjectionCapability.Touch.cs" />
     <Compile Include="Capabilities\InputInjectionCapability.Pen.cs" />
     <Compile Include="Capabilities\InputInjectionCapability.Gamepad.cs" />
+    <Compile Include="Capabilities\InputInjectionCapability.Pointer.cs" />
     <Compile Include="Capabilities\AppActionCapability.cs" />
     <Compile Include="Capabilities\LoggingCapability.cs" />
     <Compile Include="Capabilities\ScreenshotAnnotator.cs" />
@@ -201,6 +202,13 @@
     <Compile Include="..\zRover.Core\Tools\InputInjection\GamepadFrame.cs" Link="Linked\zRover.Core\Tools\GamepadFrame.cs" />
     <Compile Include="..\zRover.Core\Tools\InputInjection\InjectGamepadSequenceRequest.cs" Link="Linked\zRover.Core\Tools\InjectGamepadSequenceRequest.cs" />
     <Compile Include="..\zRover.Core\Tools\InputInjection\InjectGamepadSequenceResponse.cs" Link="Linked\zRover.Core\Tools\InjectGamepadSequenceResponse.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\PointerSessionState.cs" Link="Linked\zRover.Core\Tools\PointerSessionState.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\PointerDownRequest.cs" Link="Linked\zRover.Core\Tools\PointerDownRequest.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\PointerDownResponse.cs" Link="Linked\zRover.Core\Tools\PointerDownResponse.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\PointerMoveRequest.cs" Link="Linked\zRover.Core\Tools\PointerMoveRequest.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\PointerMoveResponse.cs" Link="Linked\zRover.Core\Tools\PointerMoveResponse.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\PointerUpRequest.cs" Link="Linked\zRover.Core\Tools\PointerUpRequest.cs" />
+    <Compile Include="..\zRover.Core\Tools\InputInjection\PointerUpResponse.cs" Link="Linked\zRover.Core\Tools\PointerUpResponse.cs" />
     <Compile Include="..\zRover.Core\Tools\Screenshot\CaptureViewRequest.cs" Link="Linked\zRover.Core\Tools\CaptureViewRequest.cs" />
     <Compile Include="..\zRover.Core\Tools\Screenshot\CaptureViewResponse.cs" Link="Linked\zRover.Core\Tools\CaptureViewResponse.cs" />
     <Compile Include="..\zRover.Core\Tools\Screenshot\CaptureRegionRequest.cs" Link="Linked\zRover.Core\Tools\CaptureRegionRequest.cs" />
