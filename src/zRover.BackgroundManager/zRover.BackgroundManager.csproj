@@ -4,6 +4,7 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net9.0-windows10.0.19041.0</TargetFramework>
     <RuntimeIdentifiers>win-x64;win-x86;win-arm64</RuntimeIdentifiers>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and '$(Platform)' == 'AnyCPU'">win-x64</RuntimeIdentifier>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -15,13 +16,18 @@
     <NoWarn>$(NoWarn);MCPEXP001</NoWarn>
     <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
     <WindowsAppSdkBootstrapInitialize>false</WindowsAppSdkBootstrapInitialize>
+    <WindowsAppSdkDeploymentManagerInitialize>false</WindowsAppSdkDeploymentManagerInitialize>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-  </PropertyGroup>
-
-  <!-- Unpackaged mode only for Debug (VS F5). Release targets MSIX deployment. -->
-  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
     <WindowsPackageType>None</WindowsPackageType>
   </PropertyGroup>
+
+  <!-- Auto-register as loose-file MSIX after build (Developer Mode required) -->
+  <Target Name="_DeployDevPackage" AfterTargets="Build"
+          Condition="'$(BuildingInsideVisualStudio)' == 'true'">
+    <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)deploy-dev.ps1&quot; -Config $(Configuration)"
+          WorkingDirectory="$(MSBuildThisFileDirectory)"
+          IgnoreExitCode="true" />
+  </Target>
 
   <ItemGroup>
     <Content Remove="Assets\**" />

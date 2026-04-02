@@ -194,7 +194,8 @@
       * Copy output to AppX\FullTrust\ for VS F5 loose-layout debugging.
       * Inject into AppxPackagePayload for .msix packaging.
   -->
-  <Target Name="_BuildFullTrustProject" BeforeTargets="PrepareForBuild">
+  <Target Name="_BuildFullTrustProject" BeforeTargets="PrepareForBuild"
+          Condition="'$(BuildingInsideVisualStudio)' != 'true' and '$(BuildingSolutionFile)' != 'true' and ('$(SolutionDir)' == '' or '$(SolutionDir)' == '*Undefined*')">
     <Exec Command="dotnet build &quot;$(MSBuildThisFileDirectory)..\zRover.FullTrust.McpServer\zRover.FullTrust.McpServer.csproj&quot; -c $(Configuration) --no-self-contained" />
   </Target>
 

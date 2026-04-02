@@ -161,9 +161,9 @@ public class Program
             App.HandleProtocolActivation(activationUri);
         }
 
-        WinRT.ComWrappersSupport.InitializeComWrappers();
-
-        // Bootstrap the WindowsAppRuntime for unpackaged execution
+        // Bootstrap the WindowsAppRuntime only when running unpackaged (VS F5).
+        // When launched as a registered package (Start Menu), the framework
+        // dependency in AppxManifest handles resolution automatically.
         bool isPackaged = false;
         try { _ = Windows.ApplicationModel.Package.Current; isPackaged = true; }
         catch { }
@@ -172,6 +172,8 @@ public class Program
         {
             Microsoft.Windows.ApplicationModel.DynamicDependency.Bootstrap.Initialize(0x00010008);
         }
+
+        WinRT.ComWrappersSupport.InitializeComWrappers();
 
         Microsoft.UI.Xaml.Application.Start(_ =>
         {

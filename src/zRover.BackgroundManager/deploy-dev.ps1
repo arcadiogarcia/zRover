@@ -27,22 +27,32 @@ if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed' }
 
 # 1b. Copy WinUI build artifacts that dotnet publish does not include (.pri, .xbf)
 $BuildDir = Join-Path $ProjectDir "bin\$Config\net9.0-windows10.0.19041.0"
-$PriSrc = Join-Path $BuildDir 'zRover.BackgroundManager.pri'
-if (-not (Test-Path $PriSrc)) {
+# Look for resources.pri in the build output (may be named resources.pri or <ProjectName>.pri)
+$PriCandidates = @(
+    (Join-Path $BuildDir 'resources.pri'),
+    (Join-Path $BuildDir 'zRover.BackgroundManager.pri'),
+    (Join-Path (Join-Path $BuildDir $Rid) 'resources.pri'),
+    (Join-Path (Join-Path $BuildDir $Rid) 'zRover.BackgroundManager.pri')
+)
+$PriSrc = $PriCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $PriSrc) {
     Write-Host 'Building to generate WinUI artifacts...'
     dotnet build $ProjectFile -c $Config -r $Rid --no-self-contained --no-restore
     if ($LASTEXITCODE -ne 0) { throw 'dotnet build failed' }
+    $PriSrc = $PriCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 }
-if (Test-Path $PriSrc) {
+if ($PriSrc) {
     Copy-Item $PriSrc (Join-Path $LayoutDir 'resources.pri') -Force
-    Write-Host 'Copied resources.pri'
+    Write-Host "Copied resources.pri from $PriSrc"
 } else {
     Write-Warning 'resources.pri not found -- WinUI may fail to start'
 }
-# Copy compiled XAML binaries (.xbf)
-Get-ChildItem $BuildDir -Filter '*.xbf' -ErrorAction SilentlyContinue | ForEach-Object {
-    Copy-Item $_.FullName (Join-Path $LayoutDir $_.Name) -Force
-    Write-Host "Copied $($_.Name)"
+# Copy compiled XAML binaries (.xbf) from both base and RID-specific build dirs
+foreach ($dir in @($BuildDir, (Join-Path $BuildDir $Rid))) {
+    Get-ChildItem $dir -Filter '*.xbf' -ErrorAction SilentlyContinue | ForEach-Object {
+        Copy-Item $_.FullName (Join-Path $LayoutDir $_.Name) -Force
+        Write-Host "Copied $($_.Name)"
+    }
 }
 
 # 2. Copy AppxManifest
