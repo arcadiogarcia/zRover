@@ -50,6 +50,12 @@
             Enabled="true"
             DisplayName="zRover Background Manager" />
         </desktop:Extension>
+        <!-- Protocol activation: zrover:// URI scheme for remote pairing -->
+        <uap:Extension Category="windows.protocol">
+          <uap:Protocol Name="zrover">
+            <uap:DisplayName>zRover Remote Control</uap:DisplayName>
+          </uap:Protocol>
+        </uap:Extension>
       </Extensions>
     </Application>
   </Applications>

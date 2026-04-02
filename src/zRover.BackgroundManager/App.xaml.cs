@@ -1,8 +1,10 @@
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppNotifications;
+using zRover.BackgroundManager.Server;
 using zRover.BackgroundManager.Sessions;
 
 namespace zRover.BackgroundManager;
@@ -118,6 +120,133 @@ public partial class App : Application
     internal static void ActivateFromExternal()
     {
         _dispatcherQueue?.TryEnqueue(ShowMainWindow);
+    }
+
+    /// <summary>
+    /// Handles named-pipe commands beyond simple activation.
+    /// Supports: enable-external, enable-external:{port}, disable-external,
+    /// connect:{url}, connect:{url}:{token}
+    /// </summary>
+    internal static void HandlePipeCommand(string message)
+    {
+        if (Services == null) return;
+        var log = Services.GetService<ILogger<App>>();
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                if (message.StartsWith("enable-external"))
+                {
+                    var external = Services.GetRequiredService<ExternalAccessManager>();
+                    int port = 5201;
+                    var parts = message.Split(':');
+                    if (parts.Length > 1 && int.TryParse(parts[1], out var p)) port = p;
+                    await external.EnableAsync(port);
+                    log?.LogInformation("External access enabled via pipe command on port {Port}", port);
+                }
+                else if (message == "disable-external")
+                {
+                    var external = Services.GetRequiredService<ExternalAccessManager>();
+                    await external.DisableAsync();
+                    log?.LogInformation("External access disabled via pipe command");
+                }
+                else if (message.StartsWith("connect:"))
+                {
+                    // Format: connect:{url} or connect:{url}:{token}
+                    var payload = message["connect:".Length..];
+                    string? token = null;
+                    string url;
+
+                    // The URL contains "://" so we need to be careful splitting
+                    // Look for token after the last space, or use a pipe-delimited format
+                    var tokenSep = payload.LastIndexOf('|');
+                    if (tokenSep > 0)
+                    {
+                        url = payload[..tokenSep];
+                        token = payload[(tokenSep + 1)..];
+                    }
+                    else
+                    {
+                        url = payload;
+                    }
+
+                    var managers = Services.GetRequiredService<RemoteManagerRegistry>();
+                    await managers.ConnectAsync(url, token);
+                    log?.LogInformation("Connected to remote manager via pipe command: {Url}", url);
+                }
+            }
+            catch (Exception ex)
+            {
+                log?.LogError(ex, "Failed to handle pipe command: {Message}", message);
+            }
+        });
+    }
+
+    /// <summary>
+    /// Handles <c>zrover://</c> protocol activation URIs.
+    /// Supported paths: enable-external, disable-external, connect, status
+    /// </summary>
+    internal static void HandleProtocolActivation(Uri uri)
+    {
+        if (Services == null) return;
+        var log = Services.GetService<ILogger<App>>();
+
+        var host = uri.Host.ToLowerInvariant();
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                switch (host)
+                {
+                    case "enable-external":
+                    {
+                        var external = Services.GetRequiredService<ExternalAccessManager>();
+                        int port = 5201;
+                        if (query["port"] is string p && int.TryParse(p, out var parsed)) port = parsed;
+                        await external.EnableAsync(port);
+                        log?.LogInformation("External access enabled via protocol activation on port {Port}", port);
+                        _dispatcherQueue?.TryEnqueue(ShowMainWindow);
+                        break;
+                    }
+                    case "disable-external":
+                    {
+                        var external = Services.GetRequiredService<ExternalAccessManager>();
+                        await external.DisableAsync();
+                        log?.LogInformation("External access disabled via protocol activation");
+                        break;
+                    }
+                    case "connect":
+                    {
+                        var url = query["url"];
+                        var token = query["token"];
+                        var alias = query["alias"];
+                        if (string.IsNullOrEmpty(url))
+                        {
+                            log?.LogWarning("Protocol activation connect: missing 'url' parameter");
+                            break;
+                        }
+                        var managers = Services.GetRequiredService<RemoteManagerRegistry>();
+                        await managers.ConnectAsync(url, token, alias);
+                        log?.LogInformation("Connected to remote manager via protocol activation: {Url}", url);
+                        _dispatcherQueue?.TryEnqueue(ShowMainWindow);
+                        break;
+                    }
+                    case "status":
+                        _dispatcherQueue?.TryEnqueue(ShowMainWindow);
+                        break;
+                    default:
+                        log?.LogWarning("Unknown protocol activation host: {Host}", host);
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                log?.LogError(ex, "Failed to handle protocol activation: {Uri}", uri);
+            }
+        });
     }
 
     private static void OnNotificationInvoked(AppNotificationManager sender, AppNotificationActivatedEventArgs args)

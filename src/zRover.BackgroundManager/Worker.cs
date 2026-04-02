@@ -7,17 +7,20 @@ namespace zRover.BackgroundManager;
 
 /// <summary>
 /// Lifecycle logger and periodic health-check for the BackgroundManager.
-/// Sweeps sessions every 10 s and removes any whose MCP endpoint is unreachable.
+/// Sweeps local sessions every 10 s and removes any whose MCP endpoint is unreachable.
+/// Also verifies remote manager connectivity and re-syncs stale connections.
 /// </summary>
 public class Worker : BackgroundService
 {
     private readonly ILogger<Worker> _logger;
     private readonly SessionRegistry _registry;
+    private readonly RemoteManagerRegistry _managers;
 
-    public Worker(ILogger<Worker> logger, SessionRegistry registry)
+    public Worker(ILogger<Worker> logger, SessionRegistry registry, RemoteManagerRegistry managers)
     {
         _logger = logger;
         _registry = registry;
+        _managers = managers;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -29,8 +32,11 @@ public class Worker : BackgroundService
             try { await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken); }
             catch (OperationCanceledException) { break; }
 
+            // Health-check local sessions (skip PropagatedSessions — they're managed by RemoteManagerRegistry)
             foreach (var session in _registry.Sessions)
             {
+                if (session is PropagatedSession) continue;
+
                 if (!session.IsConnected)
                 {
                     _registry.Remove(session.SessionId);
@@ -41,6 +47,18 @@ public class Worker : BackgroundService
                 {
                     _logger.LogInformation("Session {SessionId} unreachable, removing", session.SessionId);
                     _registry.Remove(session.SessionId);
+                }
+            }
+
+            // Health-check remote managers
+            foreach (var manager in _managers.Managers)
+            {
+                if (!manager.IsConnected) continue;
+
+                if (!await _managers.TestConnectivityAsync(manager.ManagerId, stoppingToken))
+                {
+                    _logger.LogWarning("Remote manager {Alias} ({ManagerId}) failed health check",
+                        manager.Alias, manager.ManagerId);
                 }
             }
         }

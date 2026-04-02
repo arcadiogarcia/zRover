@@ -1,6 +1,7 @@
 using System.Text.Json;
 using zRover.Core;
 using zRover.Core.Sessions;
+using zRover.BackgroundManager.Sessions;
 
 namespace zRover.BackgroundManager.Server;
 
@@ -24,16 +25,24 @@ public static class SessionManagementTools
             """{"type":"object","properties":{}}""",
             _ =>
             {
-                var apps = sessions.Sessions.Select(s => new
+                var apps = sessions.Sessions.Select(s =>
                 {
-                    sessionId  = s.SessionId,
-                    appName    = s.Identity.AppName,
-                    version    = s.Identity.Version,
-                    instanceId = s.Identity.InstanceId,
-                    displayName = s.Identity.DisplayName,
-                    mcpUrl     = s.McpUrl,
-                    isConnected = s.IsConnected,
-                    isActive   = s.SessionId == sessions.ActiveSession?.SessionId
+                    var origin = s is PropagatedSession ps
+                        ? new { type = ps.Origin.Type, managerId = ps.Origin.ManagerId, managerAlias = ps.Origin.ManagerAlias, managerUrl = ps.Origin.ManagerUrl, hops = ps.Origin.Hops }
+                        : new { type = "local", managerId = (string?)null, managerAlias = (string?)null, managerUrl = (string?)null, hops = 0 };
+
+                    return new
+                    {
+                        sessionId   = s.SessionId,
+                        appName     = s.Identity.AppName,
+                        version     = s.Identity.Version,
+                        instanceId  = s.Identity.InstanceId,
+                        displayName = s.Identity.DisplayName,
+                        mcpUrl      = s.McpUrl,
+                        isConnected = s.IsConnected,
+                        isActive    = s.SessionId == sessions.ActiveSession?.SessionId,
+                        origin
+                    };
                 });
 
                 return Task.FromResult(JsonSerializer.Serialize(new { apps }));

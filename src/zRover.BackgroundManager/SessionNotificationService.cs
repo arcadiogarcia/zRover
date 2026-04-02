@@ -46,7 +46,8 @@ public sealed class SessionNotificationService : IDisposable
         var lines = sessions.Select(s =>
         {
             var marker = s.SessionId == activeId ? "\u25b6 " : "\u2022 ";
-            return $"{marker}{s.Identity.DisplayName}";
+            var suffix = s is PropagatedSession ps ? $" ({ps.Origin.ManagerAlias})" : "";
+            return $"{marker}{s.Identity.DisplayName}{suffix}";
         });
 
         var notification = new AppNotificationBuilder()

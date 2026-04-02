@@ -4,8 +4,11 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="zRover Background Manager">
 
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
     <Grid Padding="24" RowSpacing="16">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -26,8 +29,51 @@
             <TextBlock x:Name="ListeningUrlText" Text="URL: —" Opacity="0.7"/>
         </StackPanel>
 
+        <!-- External Access -->
+        <StackPanel Grid.Row="2" Spacing="8">
+            <TextBlock Text="External Access" Style="{StaticResource SubtitleTextBlockStyle}"/>
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <ToggleSwitch x:Name="ExternalToggle"
+                              Header="Allow external connections"
+                              Toggled="OnExternalToggled"/>
+            </StackPanel>
+            <StackPanel x:Name="ExternalInfoPanel" Visibility="Collapsed" Spacing="4">
+                <TextBlock x:Name="ExternalUrlText" Opacity="0.7" IsTextSelectionEnabled="True"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="CopyLinkButton" Content="Copy connection link" Click="OnCopyLinkClicked"/>
+                </StackPanel>
+                <TextBlock x:Name="ExternalTokenText" Opacity="0.5" FontSize="11" IsTextSelectionEnabled="True"/>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Remote Managers -->
+        <StackPanel Grid.Row="3" Spacing="8">
+            <TextBlock Text="Remote Managers" Style="{StaticResource SubtitleTextBlockStyle}"/>
+            <ListView x:Name="ManagersList" MaxHeight="120">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Padding="4,2" ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Ellipse Grid.Column="0" Width="8" Height="8"
+                                     Fill="{Binding StatusColor}" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="{Binding DisplayText}" VerticalAlignment="Center"/>
+                            <Button Grid.Column="2" Content="Disconnect" Tag="{Binding ManagerId}"
+                                    Click="OnDisconnectManagerClicked" Padding="8,2"/>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+            <TextBlock x:Name="NoManagersText"
+                       Text="No remote managers connected"
+                       Opacity="0.5" FontSize="12"/>
+        </StackPanel>
+
         <!-- Sessions -->
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="4">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
@@ -75,4 +121,5 @@
 
 
     </Grid>
+    </ScrollViewer>
 </Window>

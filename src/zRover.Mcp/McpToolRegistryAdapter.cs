@@ -28,6 +28,23 @@ namespace zRover.Mcp
         {
             _tools.Add(new DelegateMcpServerTool(name, description, inputSchema, handler));
         }
+
+        /// <summary>
+        /// Forces the MCP server to send a <c>tools/list_changed</c> notification to
+        /// all connected clients. Used to signal session list changes so remote managers
+        /// can re-sync their propagated sessions.
+        /// </summary>
+        public void NotifyToolsChanged()
+        {
+            // The McpServerPrimitiveCollection fires CollectionChanged, which the
+            // MCP SDK translates into a tools/list_changed notification. We trigger
+            // this by adding and immediately removing a sentinel tool.
+            var sentinel = new DelegateMcpServerTool(
+                "__notify_sentinel__", "", """{"type":"object","properties":{}}""",
+                _ => Task.FromResult("{}"));
+            _tools.Add(sentinel);
+            _tools.Remove(sentinel);
+        }
     }
 
     /// <summary>

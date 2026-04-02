@@ -15,6 +15,7 @@
     <NoWarn>$(NoWarn);MCPEXP001</NoWarn>
     <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
     <WindowsAppSdkBootstrapInitialize>false</WindowsAppSdkBootstrapInitialize>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <!-- Unpackaged mode only for Debug (VS F5). Release targets MSIX deployment. -->

@@ -21,13 +21,45 @@ public class Program
         using var mutex = new Mutex(true, MutexName, out bool isFirst);
         if (!isFirst)
         {
-            // Another instance is running — ask it to show its window and exit.
+            // Another instance is running — forward our args and exit.
             try
             {
                 using var pipe = new NamedPipeClientStream(".", PipeName, PipeDirection.Out);
                 pipe.Connect(2000);
                 using var writer = new StreamWriter(pipe) { AutoFlush = true };
-                writer.WriteLine("activate");
+
+                // Check if launched with a zrover:// URI argument
+                var uriArg = args.FirstOrDefault(a => a.StartsWith("zrover://", StringComparison.OrdinalIgnoreCase));
+                if (uriArg != null)
+                {
+                    // Parse and convert the URI into a pipe command
+                    var uri = new Uri(uriArg);
+                    var host = uri.Host.ToLowerInvariant();
+                    var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+
+                    switch (host)
+                    {
+                        case "enable-external":
+                            var portStr = query["port"];
+                            writer.WriteLine(portStr != null ? $"enable-external:{portStr}" : "enable-external");
+                            break;
+                        case "disable-external":
+                            writer.WriteLine("disable-external");
+                            break;
+                        case "connect":
+                            var url = query["url"] ?? "";
+                            var token = query["token"];
+                            writer.WriteLine(token != null ? $"connect:{url}|{token}" : $"connect:{url}");
+                            break;
+                        default:
+                            writer.WriteLine("activate");
+                            break;
+                    }
+                }
+                else
+                {
+                    writer.WriteLine("activate");
+                }
                 pipe.WaitForPipeDrain();
             }
             catch { /* Best effort — the other instance will surface eventually. */ }
@@ -41,6 +73,8 @@ public class Program
         builder.Services.AddSingleton<ISessionRegistry>(sp => sp.GetRequiredService<SessionRegistry>());
         builder.Services.AddSingleton<McpToolRegistryAdapter>();
         builder.Services.AddSingleton<ActiveSessionProxy>();
+        builder.Services.AddSingleton<ExternalAccessManager>();
+        builder.Services.AddSingleton<RemoteManagerRegistry>();
         builder.Services.AddHostedService<Worker>();
 
         // ── Master MCP server ──────────────────────────────────────────────────────
@@ -101,6 +135,11 @@ public class Program
 
         webApp.MapMcp("/mcp");
 
+        // ── Fire tools/list_changed when sessions change (enables real-time sync) ──
+        var sessionRegistry = webApp.Services.GetRequiredService<SessionRegistry>();
+        var toolAdapter = webApp.Services.GetRequiredService<McpToolRegistryAdapter>();
+        sessionRegistry.SessionsChanged += (_, _) => toolAdapter.NotifyToolsChanged();
+
         // ── Launch web host on background thread, WinUI on main (STA) thread ────
         _ = Task.Run(async () =>
         {
@@ -112,6 +151,15 @@ public class Program
 
         // Listen for activation requests from subsequent launches
         _ = Task.Run(() => ListenForActivationAsync());
+
+        // If this instance was launched via protocol activation (zrover:// URI),
+        // handle it now. This covers the case where the app isn't running yet and
+        // the user clicks a zrover:// link for the first time.
+        var protocolArg = args.FirstOrDefault(a => a.StartsWith("zrover://", StringComparison.OrdinalIgnoreCase));
+        if (protocolArg != null && Uri.TryCreate(protocolArg, UriKind.Absolute, out var activationUri))
+        {
+            App.HandleProtocolActivation(activationUri);
+        }
 
         WinRT.ComWrappersSupport.InitializeComWrappers();
 
@@ -154,6 +202,8 @@ public class Program
                 var msg = await reader.ReadLineAsync();
                 if (msg == "activate")
                     App.ActivateFromExternal();
+                else if (msg != null)
+                    App.HandlePipeCommand(msg);
             }
             catch { /* client disconnected */ }
         }

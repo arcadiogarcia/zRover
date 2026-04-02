@@ -1,6 +1,7 @@
 using System.Text.Json;
 using zRover.Core;
 using zRover.Core.Sessions;
+using zRover.BackgroundManager.Sessions;
 using zRover.Mcp;
 
 namespace zRover.BackgroundManager.Server;
@@ -140,13 +141,26 @@ public sealed class ActiveSessionProxy
     /// </summary>
     private static string AugmentResult(string raw, IRoverSession session)
     {
+        object? originNode = null;
+        if (session is PropagatedSession ps)
+        {
+            originNode = new
+            {
+                type = ps.Origin.Type,
+                managerId = ps.Origin.ManagerId,
+                managerAlias = ps.Origin.ManagerAlias,
+                hops = ps.Origin.Hops
+            };
+        }
+
         var sessionNode = new
         {
             sessionId   = session.SessionId,
             appName     = session.Identity.AppName,
             version     = session.Identity.Version,
             instanceId  = session.Identity.InstanceId,
-            displayName = session.Identity.DisplayName
+            displayName = session.Identity.DisplayName,
+            origin      = originNode
         };
 
         try
