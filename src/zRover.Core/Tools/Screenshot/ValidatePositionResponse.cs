@@ -15,12 +15,6 @@ namespace zRover.Core.Tools.Screenshot
         public bool Success { get; set; }
 
         #if !WINDOWS_UWP
-        [JsonPropertyName("filePath")]
-#endif
-        [JsonProperty("filePath")]
-        public string? FilePath { get; set; }
-
-        #if !WINDOWS_UWP
         [JsonPropertyName("width")]
 #endif
         [JsonProperty("width")]

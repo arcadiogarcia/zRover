@@ -147,9 +147,14 @@ namespace zRover.Uwp
                         break;
                     }
 
-                    var result = await handler(argsJson ?? "{}").ConfigureAwait(false);
+                    var toolResult = await handler(argsJson ?? "{}").ConfigureAwait(false);
                     response["status"] = "success";
-                    response["result"] = result;
+                    response["result"] = toolResult.Text;
+                    if (toolResult.HasImage)
+                    {
+                        response["resultImageBytes"]    = toolResult.ImageBytes;
+                        response["resultImageMimeType"] = toolResult.ImageMimeType;
+                    }
                     RoverLog.Trace("zRover.AppService", $"invoke_tool '{toolName}' succeeded");
                     System.Diagnostics.Debug.WriteLine($"[zRover.AppService] Tool '{toolName}' invoked");
                     break;

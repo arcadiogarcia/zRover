@@ -39,45 +39,45 @@ public class McpServerToolTests : IAsyncLifetime
             "echo",
             "Echoes back the input message.",
             """{ "type": "object", "properties": { "message": { "type": "string" } }, "required": ["message"] }""",
-            async (argsJson) =>
+            (Func<string, Task<string>>)(async (argsJson) =>
             {
                 var args = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(argsJson);
                 var msg = args?["message"].GetString() ?? "";
                 return JsonSerializer.Serialize(new { echo = msg });
-            });
+            }));
 
         // Register a tool that adds two numbers
         _adapter.RegisterTool(
             "add_numbers",
             "Adds two numbers together.",
             """{ "type": "object", "properties": { "a": { "type": "number" }, "b": { "type": "number" } }, "required": ["a", "b"] }""",
-            async (argsJson) =>
+            (Func<string, Task<string>>)(async (argsJson) =>
             {
                 var args = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(argsJson);
                 var a = args?["a"].GetDouble() ?? 0;
                 var b = args?["b"].GetDouble() ?? 0;
                 return JsonSerializer.Serialize(new { result = a + b });
-            });
+            }));
 
         // Register a tool that simulates an error
         _adapter.RegisterTool(
             "fail_tool",
             "Always throws an error for testing.",
             """{ "type": "object", "properties": {} }""",
-            async (argsJson) =>
+            (Func<string, Task<string>>)(async (argsJson) =>
             {
                 throw new InvalidOperationException("Intentional test failure");
-            });
+            }));
 
         // Register a tool with no arguments
         _adapter.RegisterTool(
             "get_status",
             "Returns a status object with no arguments.",
             """{ "type": "object", "properties": {} }""",
-            async (argsJson) =>
+            (Func<string, Task<string>>)(async (argsJson) =>
             {
                 return JsonSerializer.Serialize(new { status = "ok", version = "1.0.0" });
-            });
+            }));
 
         var serverOptions = new McpServerOptions
         {

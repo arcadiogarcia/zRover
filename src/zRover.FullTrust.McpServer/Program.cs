@@ -63,18 +63,9 @@ class Program
             Console.Error.WriteLine($"[McpServer] Registering proxy tool: {tool.Name}");
             var capturedName = tool.Name;
 
-            // All inject_* tools proxy directly to UWP InputInjector
-            if (capturedName.StartsWith("inject_"))
-            {
-                adapter.RegisterTool(tool.Name, tool.Description, tool.InputSchema, async argsJson =>
-                    await backend.InvokeToolAsync(capturedName, argsJson));
-                continue;
-            }
-
-            adapter.RegisterTool(tool.Name, tool.Description, tool.InputSchema, async argsJson =>
-            {
-                return await backend.InvokeToolAsync(capturedName, argsJson);
-            });
+            adapter.RegisterTool(tool.Name, tool.Description, tool.InputSchema,
+                (Func<string, Task<RoverToolResult>>)(argsJson =>
+                    backend.InvokeToolAsync(capturedName, argsJson)));
         }
 
         // Register with the BackgroundManager if a manager URL was provided.
@@ -367,7 +358,7 @@ internal sealed class AppServiceToolBackend : IToolBackend, IDisposable
         return tools;
     }
 
-    public async Task<string> InvokeToolAsync(string toolName, string argumentsJson)
+    public async Task<RoverToolResult> InvokeToolAsync(string toolName, string argumentsJson)
     {
         var request = new ValueSet
         {
@@ -383,7 +374,16 @@ internal sealed class AppServiceToolBackend : IToolBackend, IDisposable
 
         var status = response.Message["status"] as string;
         if (status == "success")
-            return response.Message["result"] as string ?? "{}";
+        {
+            var text = response.Message["result"] as string ?? "{}";
+            var imageBytes = response.Message.TryGetValue("resultImageBytes", out var ib)
+                ? ib as byte[] : null;
+            var mimeType = response.Message.TryGetValue("resultImageMimeType", out var mt)
+                ? mt as string : null;
+            return imageBytes != null
+                ? RoverToolResult.WithImage(text, imageBytes, mimeType ?? "image/png")
+                : RoverToolResult.FromText(text);
+        }
 
         var error = response.Message.ContainsKey("error")
             ? response.Message["error"] as string

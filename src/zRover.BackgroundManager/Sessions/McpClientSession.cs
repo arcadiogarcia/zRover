@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
@@ -72,7 +75,7 @@ public sealed class McpClientSession : IRoverSession, IAsyncDisposable
         }
     }
 
-    public async Task<string> InvokeToolAsync(string toolName, string argsJson, CancellationToken cancellationToken = default)
+    public async Task<RoverToolResult> InvokeToolAsync(string toolName, string argsJson, CancellationToken cancellationToken = default)
     {
         Dictionary<string, object?>? arguments = null;
         if (!string.IsNullOrEmpty(argsJson) && argsJson != "{}")
@@ -81,8 +84,12 @@ public sealed class McpClientSession : IRoverSession, IAsyncDisposable
         try
         {
             var result = await _client.CallToolAsync(toolName, arguments, cancellationToken: cancellationToken);
-            var text = result.Content.OfType<TextContentBlock>().FirstOrDefault()?.Text;
-            return text ?? "{}";
+            var text     = result.Content.OfType<TextContentBlock>().FirstOrDefault()?.Text ?? "{}";
+            var imgBlock = result.Content.OfType<ImageContentBlock>().FirstOrDefault();
+            if (imgBlock != null)
+                return RoverToolResult.WithImage(text,
+                    imgBlock.Data.ToArray(), imgBlock.MimeType ?? "image/png");
+            return RoverToolResult.FromText(text);
         }
         catch (OperationCanceledException)
         {

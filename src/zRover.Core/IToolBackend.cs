@@ -29,9 +29,9 @@ namespace zRover.Core
 
         /// <summary>
         /// Invokes a tool by name, passing JSON-serialized arguments and
-        /// returning a JSON result string.
+        /// returning a structured result that may include an inline image.
         /// Equivalent to the "invoke_tool" AppService command.
         /// </summary>
-        Task<string> InvokeToolAsync(string toolName, string argumentsJson);
+        Task<RoverToolResult> InvokeToolAsync(string toolName, string argumentsJson);
     }
 }

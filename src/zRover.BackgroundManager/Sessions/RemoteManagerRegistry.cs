@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
+using zRover.BackgroundManager.Server;
 using zRover.Core.Sessions;
 
 namespace zRover.BackgroundManager.Sessions;
@@ -23,6 +24,7 @@ namespace zRover.BackgroundManager.Sessions;
 public sealed class RemoteManagerRegistry : IDisposable
 {
     private readonly SessionRegistry _sessionRegistry;
+    private readonly ActiveSessionProxy _activeSessionProxy;
     private readonly ILogger<RemoteManagerRegistry> _logger;
     private readonly object _lock = new();
     private readonly Dictionary<string, RemoteManagerConnection> _managers = new();
@@ -38,9 +40,10 @@ public sealed class RemoteManagerRegistry : IDisposable
 
     public event EventHandler? ManagersChanged;
 
-    public RemoteManagerRegistry(SessionRegistry sessionRegistry, ILogger<RemoteManagerRegistry> logger)
+    public RemoteManagerRegistry(SessionRegistry sessionRegistry, ActiveSessionProxy activeSessionProxy, ILogger<RemoteManagerRegistry> logger)
     {
         _sessionRegistry = sessionRegistry;
+        _activeSessionProxy = activeSessionProxy;
         _logger = logger;
     }
 
@@ -267,6 +270,7 @@ public sealed class RemoteManagerRegistry : IDisposable
 
             _sessionRegistry.Add(propagated);
             connection.PropagatedSessionIds.Add(propagatedId);
+            await _activeSessionProxy.OnSessionRegisteredAsync(propagated);
 
             _logger.LogInformation("Propagated session: {DisplayName} as {PropagatedId}",
                 identity.DisplayName, propagatedId);

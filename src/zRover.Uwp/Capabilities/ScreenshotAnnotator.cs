@@ -40,6 +40,29 @@ namespace zRover.Uwp.Capabilities
 
         #endregion
 
+        #region Encode
+
+        /// <summary>
+        /// Encodes a <see cref="SoftwareBitmap"/> to a PNG byte array in memory.
+        /// Used by screenshot tools to embed the image directly in the MCP response
+        /// as an <c>ImageContentBlock</c>, avoiding filesystem path sharing.
+        /// </summary>
+        public static async Task<byte[]> EncodeToPngBytesAsync(SoftwareBitmap bitmap)
+        {
+            var stream = new InMemoryRandomAccessStream();
+            var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, stream);
+            var converted = SoftwareBitmap.Convert(bitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
+            encoder.SetSoftwareBitmap(converted);
+            await encoder.FlushAsync();
+            var reader = new DataReader(stream.GetInputStreamAt(0));
+            await reader.LoadAsync((uint)stream.Size);
+            var bytes = new byte[stream.Size];
+            reader.ReadBytes(bytes);
+            return bytes;
+        }
+
+        #endregion
+
         #region Annotation — Crosshair / Tap marker
 
         /// <summary>

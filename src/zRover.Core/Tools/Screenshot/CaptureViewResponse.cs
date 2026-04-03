@@ -14,12 +14,6 @@ namespace zRover.Core.Tools.Screenshot
         [JsonProperty("success")]
         public bool Success { get; set; }
 
-        #if !WINDOWS_UWP
-        [JsonPropertyName("filePath")]
-#endif
-        [JsonProperty("filePath")]
-        public string? FilePath { get; set; }
-
         /// <summary>
         /// Width of the returned bitmap file in pixels (may be less than windowWidth
         /// if maxWidth rescaling was applied).

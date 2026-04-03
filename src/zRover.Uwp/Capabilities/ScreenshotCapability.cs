@@ -102,7 +102,7 @@ namespace zRover.Uwp.Capabilities
                 CaptureRegionAsync);
         }
 
-        private async Task<string> CaptureAsync(string argsJson)
+        private async Task<RoverToolResult> CaptureAsync(string argsJson)
         {
             try
             {
@@ -132,26 +132,25 @@ namespace zRover.Uwp.Capabilities
 
                 bitmap = await ScreenshotAnnotator.ResizeBitmapAsync(bitmap, maxW, maxH).ConfigureAwait(false);
 
-                var storageFile = await ScreenshotAnnotator.SaveScreenshotAsync(bitmap, "frame").ConfigureAwait(false);
+                var pngBytes = await ScreenshotAnnotator.EncodeToPngBytesAsync(bitmap).ConfigureAwait(false);
 
                 var response = new CaptureViewResponse
                 {
-                    Success = true,
-                    FilePath = storageFile.Path,
+                    Success      = true,
                     BitmapWidth  = bitmap.PixelWidth,
                     BitmapHeight = bitmap.PixelHeight,
                     WindowWidth  = windowWidth,
                     WindowHeight = windowHeight
                 };
-                return JsonConvert.SerializeObject(response);
+                return RoverToolResult.WithImage(JsonConvert.SerializeObject(response), pngBytes);
             }
             catch (Exception ex)
             {
-                return JsonConvert.SerializeObject(new { success = false, error = ex.Message });
+                return RoverToolResult.FromText(JsonConvert.SerializeObject(new { success = false, error = ex.Message }));
             }
         }
 
-        private async Task<string> CaptureRegionAsync(string argsJson)
+        private async Task<RoverToolResult> CaptureRegionAsync(string argsJson)
         {
             try
             {
@@ -207,27 +206,26 @@ namespace zRover.Uwp.Capabilities
                 int scaledFullW = (int)(fullW * scaleX);
                 int scaledFullH = (int)(fullH * scaleY);
 
-                var storageFile = await ScreenshotAnnotator.SaveScreenshotAsync(cropped, "region").ConfigureAwait(false);
+                var pngBytes = await ScreenshotAnnotator.EncodeToPngBytesAsync(cropped).ConfigureAwait(false);
 
                 var response = new CaptureRegionResponse
                 {
                     Success = true,
-                    FilePath = storageFile.Path,
                     RegionWidth = resizedCropW,
                     RegionHeight = resizedCropH,
                     FullWidth = scaledFullW,
                     FullHeight = scaledFullH,
                     NormalizedRegion = new NormalizedRect { X = nx, Y = ny, Width = nw, Height = nh }
                 };
-                return JsonConvert.SerializeObject(response);
+                return RoverToolResult.WithImage(JsonConvert.SerializeObject(response), pngBytes);
             }
             catch (Exception ex)
             {
-                return JsonConvert.SerializeObject(new { success = false, error = ex.Message });
+                return RoverToolResult.FromText(JsonConvert.SerializeObject(new { success = false, error = ex.Message }));
             }
         }
 
-        private async Task<string> ValidatePositionAsync(string argsJson)
+        private async Task<RoverToolResult> ValidatePositionAsync(string argsJson)
         {
             try
             {
@@ -263,22 +261,21 @@ namespace zRover.Uwp.Capabilities
                 var annotated = ScreenshotAnnotator.DrawCrosshair(bitmap, cx, cy);
                 annotated = await ScreenshotAnnotator.ResizeBitmapAsync(annotated, maxW, maxH).ConfigureAwait(false);
 
-                var storageFile = await ScreenshotAnnotator.SaveScreenshotAsync(annotated, "validate").ConfigureAwait(false);
+                var pngBytes = await ScreenshotAnnotator.EncodeToPngBytesAsync(annotated).ConfigureAwait(false);
 
                 var response = new ValidatePositionResponse
                 {
                     Success = true,
-                    FilePath = storageFile.Path,
-                    Width = annotated.PixelWidth,
-                    Height = annotated.PixelHeight,
+                    Width   = annotated.PixelWidth,
+                    Height  = annotated.PixelHeight,
                     MarkerX = nx,
                     MarkerY = ny
                 };
-                return JsonConvert.SerializeObject(response);
+                return RoverToolResult.WithImage(JsonConvert.SerializeObject(response), pngBytes);
             }
             catch (Exception ex)
             {
-                return JsonConvert.SerializeObject(new { success = false, error = ex.Message });
+                return RoverToolResult.FromText(JsonConvert.SerializeObject(new { success = false, error = ex.Message }));
             }
         }
     }

@@ -89,23 +89,24 @@ public sealed class ActiveSessionProxy
             foreach (var tool in tools)
             {
                 var capturedName = tool.Name;
-                _adapter.RegisterTool(tool.Name, tool.Description, tool.InputSchema, argsJson =>
-                    ProxyInvokeAsync(capturedName, argsJson));
+                _adapter.RegisterTool(tool.Name, tool.Description, tool.InputSchema,
+                    (Func<string, Task<RoverToolResult>>)(argsJson =>
+                        ProxyInvokeAsync(capturedName, argsJson)));
             }
 
             _toolsInitialised = true;
         }
     }
 
-    private async Task<string> ProxyInvokeAsync(string toolName, string argsJson)
+    private async Task<RoverToolResult> ProxyInvokeAsync(string toolName, string argsJson)
     {
         var activeSession = _sessions.ActiveSession;
         if (activeSession == null || !activeSession.IsConnected)
-            return JsonSerializer.Serialize(new
+            return RoverToolResult.FromText(JsonSerializer.Serialize(new
             {
                 error = "no_active_session",
                 message = "No active app session is set. Use set_active_app to choose one, then retry."
-            });
+            }));
 
         // Capture the CTS for the current active session so that if the session changes
         // mid-call we cancel this invocation, not a future one.
@@ -114,20 +115,23 @@ public sealed class ActiveSessionProxy
         try
         {
             var raw = await activeSession.InvokeToolAsync(toolName, argsJson, sessionCts.Token);
-            return AugmentResult(raw, activeSession);
+            var augmentedText = AugmentResult(raw.Text, activeSession);
+            return raw.HasImage
+                ? RoverToolResult.WithImage(augmentedText, raw.ImageBytes!, raw.ImageMimeType ?? "image/png")
+                : RoverToolResult.FromText(augmentedText);
         }
         catch (OperationCanceledException)
         {
-            return JsonSerializer.Serialize(new
+            return RoverToolResult.FromText(JsonSerializer.Serialize(new
             {
                 error = "interrupted",
                 message = "Tool call was interrupted because the active session changed or disconnected. Use set_active_app to set a new active session and retry."
-            });
+            }));
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Tool {Tool} failed on session {SessionId}", toolName, activeSession.SessionId);
-            return JsonSerializer.Serialize(new { error = "invocation_failed", message = ex.Message });
+            return RoverToolResult.FromText(JsonSerializer.Serialize(new { error = "invocation_failed", message = ex.Message }));
         }
     }
 

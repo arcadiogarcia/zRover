@@ -227,6 +227,7 @@
     <Compile Include="..\zRover.Core\Logging\InMemoryLogStore.cs" Link="Linked\zRover.Core\Logging\InMemoryLogStore.cs" />
     <Compile Include="..\zRover.Core\Logging\RoverLog.cs" Link="Linked\zRover.Core\Logging\RoverLog.cs" />
     <Compile Include="..\zRover.Core\RoverPorts.cs" Link="Linked\zRover.Core\RoverPorts.cs" />
+    <Compile Include="..\zRover.Core\RoverToolResult.cs" Link="Linked\zRover.Core\RoverToolResult.cs" />
   </ItemGroup>
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '14.0' ">
     <VisualStudioVersion>14.0</VisualStudioVersion>

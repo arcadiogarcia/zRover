@@ -39,7 +39,8 @@ namespace zRover.Core.Sessions
         /// Forwards a tool invocation to the app. The provided
         /// <paramref name="cancellationToken"/> should be linked to the active-session
         /// lifetime so calls are cancelled when the session is deactivated.
+        /// Returns a <see cref="RoverToolResult"/> that may include an inline image.
         /// </summary>
-        Task<string> InvokeToolAsync(string toolName, string argsJson, CancellationToken cancellationToken = default);
+        Task<RoverToolResult> InvokeToolAsync(string toolName, string argsJson, CancellationToken cancellationToken = default);
     }
 }

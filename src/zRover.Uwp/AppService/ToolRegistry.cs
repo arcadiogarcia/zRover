@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using zRover.Core;
 
 namespace zRover.Uwp.AppService
 {
@@ -10,7 +11,8 @@ namespace zRover.Uwp.AppService
         public string Name { get; set; } = "";
         public string Description { get; set; } = "";
         public string InputSchema { get; set; } = "{}";
-        public Func<string, Task<string>> Handler { get; set; } = _ => Task.FromResult("{}");
+        public Func<string, Task<RoverToolResult>> Handler { get; set; } =
+            _ => Task.FromResult(RoverToolResult.FromText("{}"));
     }
 
     /// <summary>
@@ -27,7 +29,8 @@ namespace zRover.Uwp.AppService
 
         private ToolRegistry() { }
 
-        public void RegisterTool(string name, string description, string inputSchema, Func<string, Task<string>> handler)
+        public void RegisterTool(string name, string description, string inputSchema,
+            Func<string, Task<RoverToolResult>> handler)
         {
             lock (_lock)
             {
@@ -36,7 +39,7 @@ namespace zRover.Uwp.AppService
             }
         }
 
-        public bool TryGetTool(string name, out Func<string, Task<string>> handler)
+        public bool TryGetTool(string name, out Func<string, Task<RoverToolResult>> handler)
         {
             lock (_lock)
             {

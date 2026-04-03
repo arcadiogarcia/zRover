@@ -215,6 +215,16 @@ namespace zRover.Uwp
 
         public void RegisterTool(string name, string description, string inputSchema, Func<string, Task<string>> handler)
         {
+            Tools[name] = new SimpleToolEntry
+            {
+                Description = description,
+                InputSchema = inputSchema,
+                Handler = async args => RoverToolResult.FromText(await handler(args))
+            };
+        }
+
+        public void RegisterTool(string name, string description, string inputSchema, Func<string, Task<RoverToolResult>> handler)
+        {
             Tools[name] = new SimpleToolEntry { Description = description, InputSchema = inputSchema, Handler = handler };
         }
     }
@@ -223,7 +233,7 @@ namespace zRover.Uwp
     {
         public string Description { get; set; } = "";
         public string InputSchema { get; set; } = "{}";
-        public Func<string, Task<string>> Handler { get; set; } = _ => Task.FromResult("{}");
+        public Func<string, Task<RoverToolResult>> Handler { get; set; } = _ => Task.FromResult(RoverToolResult.FromText("{}"));
     }
 }
 

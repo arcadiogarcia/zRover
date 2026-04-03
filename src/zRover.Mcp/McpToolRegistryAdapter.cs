@@ -29,6 +29,15 @@ namespace zRover.Mcp
             _tools.Add(new DelegateMcpServerTool(name, description, inputSchema, handler));
         }
 
+        public void RegisterTool(
+            string name,
+            string description,
+            string inputSchema,
+            Func<string, Task<RoverToolResult>> handler)
+        {
+            _tools.Add(new RichDelegateMcpServerTool(name, description, inputSchema, handler));
+        }
+
         /// <summary>
         /// Forces the MCP server to send a <c>tools/list_changed</c> notification to
         /// all connected clients. Used to signal session list changes so remote managers
@@ -102,6 +111,69 @@ namespace zRover.Mcp
                     new TextContentBlock { Text = resultJson }
                 }
             };
+        }
+    }
+
+    /// <summary>
+    /// An <see cref="McpServerTool"/> subclass whose handler returns a
+    /// <see cref="RoverToolResult"/>. When the result carries image bytes they are
+    /// emitted as an MCP <c>ImageContentBlock</c> alongside the text block,
+    /// enabling MCP-native image delivery without filesystem path sharing.
+    /// </summary>
+    internal sealed class RichDelegateMcpServerTool : McpServerTool
+    {
+        private static readonly JsonSerializerOptions SerializerOptions = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+        private readonly Func<string, Task<RoverToolResult>> _handler;
+
+        public override Tool ProtocolTool { get; }
+
+        public override IReadOnlyList<object> Metadata { get; } = Array.Empty<object>();
+
+        internal RichDelegateMcpServerTool(
+            string name,
+            string description,
+            string inputSchema,
+            Func<string, Task<RoverToolResult>> handler)
+        {
+            _handler = handler;
+
+            ProtocolTool = new Tool
+            {
+                Name = name,
+                Description = description,
+                InputSchema = JsonDocument.Parse(inputSchema).RootElement
+            };
+        }
+
+        public override async ValueTask<CallToolResult> InvokeAsync(
+            RequestContext<CallToolRequestParams> request,
+            CancellationToken cancellationToken = default)
+        {
+            var argsJson = request.Params?.Arguments is { } args
+                ? JsonSerializer.Serialize(args, SerializerOptions)
+                : "{}";
+
+            var result = await _handler(argsJson).ConfigureAwait(false);
+
+            var content = new List<ContentBlock>
+            {
+                new TextContentBlock { Text = result.Text }
+            };
+
+            if (result.HasImage)
+            {
+                content.Add(new ImageContentBlock
+                {
+                    Data     = new System.ReadOnlyMemory<byte>(result.ImageBytes!),
+                    MimeType = result.ImageMimeType!
+                });
+            }
+
+            return new CallToolResult { Content = content };
         }
     }
 }
