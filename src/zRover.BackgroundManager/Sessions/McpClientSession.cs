@@ -88,7 +88,7 @@ public sealed class McpClientSession : IRoverSession, IAsyncDisposable
             var imgBlock = result.Content.OfType<ImageContentBlock>().FirstOrDefault();
             if (imgBlock != null)
                 return RoverToolResult.WithImage(text,
-                    imgBlock.Data.ToArray(), imgBlock.MimeType ?? "image/png");
+                    imgBlock.DecodedData.ToArray(), imgBlock.MimeType ?? "image/png");
             return RoverToolResult.FromText(text);
         }
         catch (OperationCanceledException)

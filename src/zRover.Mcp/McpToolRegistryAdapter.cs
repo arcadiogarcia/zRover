@@ -166,11 +166,7 @@ namespace zRover.Mcp
 
             if (result.HasImage)
             {
-                content.Add(new ImageContentBlock
-                {
-                    Data     = new System.ReadOnlyMemory<byte>(result.ImageBytes!),
-                    MimeType = result.ImageMimeType!
-                });
+                content.Add(ImageContentBlock.FromBytes(result.ImageBytes!, result.ImageMimeType!));
             }
 
             return new CallToolResult { Content = content };
