@@ -1,0 +1,17 @@
+[
+  {
+    "Name": "Manager + UWP",
+    "Projects": [
+      {
+        "Path": "zRover.Uwp.Sample\\zRover.Uwp.Sample.csproj",
+        "Action": "Start",
+        "DebugTarget": "Local Machine"
+      },
+      {
+        "Path": "zRover.BackgroundManager\\zRover.BackgroundManager.csproj",
+        "Action": "Start",
+        "DebugTarget": "zRover.BackgroundManager"
+      }
+    ]
+  }
+]

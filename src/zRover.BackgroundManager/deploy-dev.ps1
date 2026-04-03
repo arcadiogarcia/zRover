@@ -19,6 +19,14 @@ $ProjectDir = $PSScriptRoot
 $ProjectFile = Join-Path $ProjectDir 'zRover.BackgroundManager.csproj'
 $Rid = "win-$Arch"
 
+# 0. Stop any running instance so DLLs in the deploy folder are not locked
+$running = Get-Process -Name 'zRover.BackgroundManager' -ErrorAction SilentlyContinue
+if ($running) {
+    Write-Host "Stopping running zRover.BackgroundManager (PID $($running.Id -join ', '))..."
+    $running | Stop-Process -Force
+    $running | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
+}
+
 # 1. Publish to a stable layout folder
 $LayoutDir = Join-Path $ProjectDir "bin\Deploy\$Config-$Arch"
 Write-Host "Building ($Config|$Arch) -> $LayoutDir"
