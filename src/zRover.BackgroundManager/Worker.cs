@@ -1,6 +1,7 @@
 using System.Net.Sockets;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using zRover.BackgroundManager.Packages;
 using zRover.BackgroundManager.Sessions;
 
 namespace zRover.BackgroundManager;
@@ -15,12 +16,18 @@ public class Worker : BackgroundService
     private readonly ILogger<Worker> _logger;
     private readonly SessionRegistry _registry;
     private readonly RemoteManagerRegistry _managers;
+    private readonly PackageStagingManager _staging;
 
-    public Worker(ILogger<Worker> logger, SessionRegistry registry, RemoteManagerRegistry managers)
+    public Worker(
+        ILogger<Worker> logger,
+        SessionRegistry registry,
+        RemoteManagerRegistry managers,
+        PackageStagingManager staging)
     {
-        _logger = logger;
+        _logger  = logger;
         _registry = registry;
         _managers = managers;
+        _staging  = staging;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -61,6 +68,9 @@ public class Worker : BackgroundService
                         manager.Alias, manager.ManagerId);
                 }
             }
+
+            // Purge expired staging entries and orphaned temp files
+            _staging.PurgeExpired();
         }
 
         _logger.LogInformation("zRover.BackgroundManager stopping");

@@ -66,6 +66,12 @@
     <Capability Name="privateNetworkClientServer" />
     <!-- runFullTrust is required for all packaged Win32/desktop apps -->
     <rescap:Capability Name="runFullTrust" />
+    <!-- appDiagnostics: preferred path for stop_app via AppDiagnosticInfo.
+         Falls back to Win32 process enumeration if not granted. -->
+    <rescap:Capability Name="appDiagnostics" />
+    <!-- packageManagement: required only for installForAllUsers / removeForAllUsers.
+         Per-user install/uninstall works without this capability. -->
+    <rescap:Capability Name="packageManagement" />
   </Capabilities>
 
 </Package>

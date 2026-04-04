@@ -1,6 +1,7 @@
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
-VisualStudioVersion = 18.4.11620.152 stable
+VisualStudioVersion = 18.4.11620.152
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "zRover.Core", "zRover.Core\zRover.Core.csproj", "{A1270001-B000-4000-8000-000000000001}"
 EndProject
@@ -15,6 +16,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "zRover.BackgroundManager", "zRover.BackgroundManager\zRover.BackgroundManager.csproj", "{A1270006-B000-4000-8000-000000000006}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "zRover.Mcp.IntegrationTests", "zRover.Mcp.IntegrationTests\zRover.Mcp.IntegrationTests.csproj", "{B1EF728C-FBC0-4720-A246-B0BF295C703A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "zRover.BackgroundManager.Tests", "zRover.BackgroundManager.Tests\zRover.BackgroundManager.Tests.csproj", "{C16374F2-CA3A-418D-8B88-9FC9935F730D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -190,11 +193,28 @@ Global
 		{B1EF728C-FBC0-4720-A246-B0BF295C703A}.Release|x64.Build.0 = Release|Any CPU
 		{B1EF728C-FBC0-4720-A246-B0BF295C703A}.Release|x86.ActiveCfg = Release|Any CPU
 		{B1EF728C-FBC0-4720-A246-B0BF295C703A}.Release|x86.Build.0 = Release|Any CPU
+		{C16374F2-CA3A-418D-8B88-9FC9935F730D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C16374F2-CA3A-418D-8B88-9FC9935F730D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C16374F2-CA3A-418D-8B88-9FC9935F730D}.Debug|ARM.ActiveCfg = Debug|Any CPU
+		{C16374F2-CA3A-418D-8B88-9FC9935F730D}.Debug|ARM.Build.0 = Debug|Any CPU
+		{C16374F2-CA3A-418D-8B88-9FC9935F730D}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{C16374F2-CA3A-418D-8B88-9FC9935F730D}.Debug|ARM64.Build.0 = Debug|Any CPU
+		{C16374F2-CA3A-418D-8B88-9FC9935F730D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{C16374F2-CA3A-418D-8B88-9FC9935F730D}.Debug|x64.Build.0 = Debug|Any CPU
+		{C16374F2-CA3A-418D-8B88-9FC9935F730D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{C16374F2-CA3A-418D-8B88-9FC9935F730D}.Debug|x86.Build.0 = Debug|Any CPU
+		{C16374F2-CA3A-418D-8B88-9FC9935F730D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C16374F2-CA3A-418D-8B88-9FC9935F730D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C16374F2-CA3A-418D-8B88-9FC9935F730D}.Release|ARM.ActiveCfg = Release|Any CPU
+		{C16374F2-CA3A-418D-8B88-9FC9935F730D}.Release|ARM.Build.0 = Release|Any CPU
+		{C16374F2-CA3A-418D-8B88-9FC9935F730D}.Release|ARM64.ActiveCfg = Release|Any CPU
+		{C16374F2-CA3A-418D-8B88-9FC9935F730D}.Release|ARM64.Build.0 = Release|Any CPU
+		{C16374F2-CA3A-418D-8B88-9FC9935F730D}.Release|x64.ActiveCfg = Release|Any CPU
+		{C16374F2-CA3A-418D-8B88-9FC9935F730D}.Release|x64.Build.0 = Release|Any CPU
+		{C16374F2-CA3A-418D-8B88-9FC9935F730D}.Release|x86.ActiveCfg = Release|Any CPU
+		{C16374F2-CA3A-418D-8B88-9FC9935F730D}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
-	EndGlobalSection
-	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {E7A3F201-9C4D-4B8E-A1D6-ROVER0000001}
 	EndGlobalSection
 EndGlobal

@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
+using zRover.BackgroundManager.Packages;
 using zRover.Mcp;
 
 namespace zRover.BackgroundManager.Server;
@@ -68,6 +69,7 @@ public sealed class ExternalAccessManager : IDisposable
         builder.Services.AddSingleton<Core.Sessions.ISessionRegistry>(sp =>
             sp.GetRequiredService<Sessions.SessionRegistry>());
         builder.Services.AddSingleton(_rootServices.GetRequiredService<ActiveSessionProxy>());
+        builder.Services.AddSingleton(_rootServices.GetRequiredService<PackageStagingManager>());
 
         builder.Services.AddMcpServer(options =>
         {
@@ -90,9 +92,16 @@ public sealed class ExternalAccessManager : IDisposable
 
         var token = BearerToken; // capture for closure
 
-        // Bearer-token auth middleware for all requests
+        // Bearer-token auth middleware for all requests.
+        // /packages/stage/{token} paths are self-authenticating via their embedded
+        // 256-bit single-use token and are therefore exempt from bearer auth.
         app.Use(async (context, next) =>
         {
+            if (context.Request.Path.StartsWithSegments("/packages/stage"))
+            {
+                await next();
+                return;
+            }
             var auth = context.Request.Headers.Authorization.ToString();
             if (string.IsNullOrEmpty(auth) || auth != $"Bearer {token}")
             {
@@ -139,6 +148,10 @@ public sealed class ExternalAccessManager : IDisposable
         });
 
         app.MapMcp("/mcp");
+
+        // Package staging upload endpoint (shared with primary server)
+        var externalStaging = app.Services.GetRequiredService<PackageStagingManager>();
+        PackageStagingEndpoint.MapStagingEndpoints(app, externalStaging);
 
         _shutdownCts = new CancellationTokenSource();
         _externalApp = app;

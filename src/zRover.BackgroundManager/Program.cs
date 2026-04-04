@@ -3,6 +3,7 @@ using Microsoft.UI.Dispatching;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using zRover.BackgroundManager;
+using zRover.BackgroundManager.Packages;
 using zRover.BackgroundManager.Server;
 using zRover.BackgroundManager.Sessions;
 using zRover.Core.Sessions;
@@ -75,6 +76,8 @@ public class Program
         builder.Services.AddSingleton<ActiveSessionProxy>();
         builder.Services.AddSingleton<ExternalAccessManager>();
         builder.Services.AddSingleton<RemoteManagerRegistry>();
+        builder.Services.AddSingleton<PackageStagingManager>();
+        builder.Services.AddSingleton<IDevicePackageManager, LocalDevicePackageManager>();
         builder.Services.AddHostedService<Worker>();
 
         // ── Master MCP server ──────────────────────────────────────────────────────
@@ -90,9 +93,17 @@ public class Program
         var webApp = builder.Build();
 
         // ── Initialise management tools in the adapter ─────────────────────────────
-        var adapter  = webApp.Services.GetRequiredService<McpToolRegistryAdapter>();
-        var sessions = webApp.Services.GetRequiredService<ISessionRegistry>();
+        var adapter        = webApp.Services.GetRequiredService<McpToolRegistryAdapter>();
+        var sessions       = webApp.Services.GetRequiredService<ISessionRegistry>();
+        var stagingManager = webApp.Services.GetRequiredService<PackageStagingManager>();
+        var localPkgMgr    = webApp.Services.GetRequiredService<IDevicePackageManager>();
+        var remoteMgrs     = webApp.Services.GetRequiredService<RemoteManagerRegistry>();
+        var extAccess      = webApp.Services.GetRequiredService<ExternalAccessManager>();
+        var pkgLogger      = webApp.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Packages");
+
         SessionManagementTools.Register(adapter, sessions);
+        DevicePackageManagementTools.Register(
+            adapter, localPkgMgr, stagingManager, remoteMgrs, extAccess, pkgLogger);
 
         var mcpOptions = webApp.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<McpServerOptions>>().Value;
         mcpOptions.ToolCollection = adapter.Tools;
@@ -134,6 +145,9 @@ public class Program
         });
 
         webApp.MapMcp("/mcp");
+
+        // ── Package staging upload endpoint ───────────────────────────────────────
+        PackageStagingEndpoint.MapStagingEndpoints(webApp, stagingManager);
 
         // ── Fire tools/list_changed when sessions change (enables real-time sync) ──
         var sessionRegistry = webApp.Services.GetRequiredService<SessionRegistry>();

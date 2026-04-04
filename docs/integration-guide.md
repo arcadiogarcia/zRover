@@ -29,6 +29,7 @@ Add AI-driven UI automation to any UWP app. zRover exposes your app's screen and
   - [UI Tree Tools](#ui-tree-tools)
   - [Window Tools](#window-tools)
   - [Wait Tools](#wait-tools)
+  - [Background Manager: Package Management Tools](#background-manager-package-management-tools)
 - [Coordinate Spaces](#coordinate-spaces)
 - [Preview & Dry Run](#preview--dry-run)
 - [Requirements & Limitations](#requirements--limitations)
@@ -292,7 +293,7 @@ var tools = await client.ListToolsAsync();
 
 ## Available Tools
 
-zRover registers **22 tools** organized across screenshot capture, touch/mouse, keyboard, pen, gamepad input, app-defined action dispatch, logging, UI tree inspection, window management, and condition polling.
+zRover registers **22 tools** organized across screenshot capture, touch/mouse, keyboard, pen, gamepad input, app-defined action dispatch, logging, UI tree inspection, window management, and condition polling. The Background Manager additionally exposes **10 package management tools** (see [Background Manager: Package Management Tools](#background-manager-package-management-tools)).
 
 ### Screenshot Tools
 
@@ -732,6 +733,127 @@ Blocks until a condition is met or the timeout expires. Use this to synchronize 
 - `log_match` — polls the in-memory log store until an entry matching `pattern` appears. Good for waiting for a specific event to be logged by the host app.
 
 **Returns:** `{ success, condition, elapsedMs, reason }` — `reason` explains why the wait ended (e.g. `"stable"`, `"matched"`, `"timeout"`).
+
+---
+
+### Background Manager: Package Management Tools
+
+The Background Manager exposes 10 additional MCP tools for MSIX package management. These tools are available on the Background Manager's MCP endpoint (port 5200 by default) and support multi-device routing via the `deviceId` parameter.
+
+For full documentation of the upload flow, hop-by-hop forwarding, and security model, see the [MSIX Package Management](multi-machine-federation.md#msix-package-management) section in the Multi-Machine Federation guide.
+
+#### `list_devices`
+
+Lists all devices reachable from this Background Manager instance (local device plus all federated remote managers).
+
+**Parameters:** none
+
+**Returns:** Array of `{ deviceId, displayName, hops, isLocal }`.
+
+#### `list_installed_packages`
+
+Lists MSIX packages installed on a device.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `deviceId` | string | `"local"` | Target device. |
+| `nameFilter` | string | *(none)* | Filter by package family name or display name substring. |
+| `includeFrameworks` | boolean | `false` | Include framework packages. |
+| `includeSystemPackages` | boolean | `false` | Include resource/system packages. |
+
+**Returns:** Array of `PackageInfo` objects with family name, full name, display name, version, publisher, install date, architecture, signing status, running state, and app entries.
+
+#### `get_package_info`
+
+Returns full metadata for a single package including dependencies, capabilities, and health status flags.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `deviceId` | string | `"local"` | Target device. |
+| `packageFamilyName` | string | *(required)* | Package family name to look up. |
+
+#### `install_package`
+
+Installs an MSIX package from a URI or a staged upload.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `deviceId` | string | `"local"` | Target device. |
+| `packageUri` | string | *(required)* | URI of the package to install. Schemes: `https://`, `file://`, `ms-appinstaller://`, `staged://<stagingId>`. |
+| `dependencyUris` | array | `[]` | Dependency package URIs to install alongside. |
+| `forceAppShutdown` | boolean | `false` | Force-close the app if it is currently running. |
+| `allowUnsigned` | boolean | `false` | Allow packages without a trusted signature (Developer Mode required). |
+| `installForAllUsers` | boolean | `false` | Install as a full (non-stub) package for all users. |
+| `deferRegistration` | boolean | `false` | Defer registration until the package is no longer in use. |
+
+**Returns:** `{ success, packageFamilyName, packageFullName, version, wasUpdate, isDeferred }` on success.
+
+#### `uninstall_package`
+
+Removes an installed MSIX package.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `deviceId` | string | `"local"` | Target device. |
+| `packageFamilyName` | string | *(required)* | Package to remove. |
+| `removeForAllUsers` | boolean | `false` | Remove for all users (requires elevated privilege). |
+| `preserveAppData` | boolean | `false` | Keep the app's local data after removal. |
+
+#### `launch_app`
+
+Launches an app entry within an installed package.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `deviceId` | string | `"local"` | Target device. |
+| `packageFamilyName` | string | *(required)* | Package containing the app. |
+| `appId` | string | *(none)* | Specific app entry ID. If omitted, the first entry is launched. |
+| `arguments` | string | `""` | Command-line arguments to pass to the app. |
+
+**Returns:** `{ success, pid, aumid }` on success.
+
+#### `stop_app`
+
+Stops all running instances of a package.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `deviceId` | string | `"local"` | Target device. |
+| `packageFamilyName` | string | *(required)* | Package to stop. |
+| `force` | boolean | `false` | Kill immediately without sending WM_CLOSE first. |
+
+**Returns:** `{ success, stoppedCount }`.
+
+#### `request_package_upload`
+
+Negotiates an upload slot for sending an MSIX file to a device. In multi-hop federation, the upload flows through each manager in the chain.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `deviceId` | string | `"local"` | Target device. |
+| `fileName` | string | *(required)* | Original file name (e.g. `MyApp_1.0.0.0_x64.msix`). |
+| `fileSizeBytes` | integer | *(required)* | Exact file size in bytes. |
+| `sha256` | string | *(required)* | Hex-encoded SHA-256 hash of the file (verified at every hop). |
+
+**Returns:** `{ stagingId, uploadUrl, expiresAt }`. POST the raw binary of the MSIX to `uploadUrl` with `Content-Type: application/octet-stream`.
+
+#### `get_package_stage_status`
+
+Checks the status of a pending or completed staged upload.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `stagingId` | string | *(required)* | Staging ID returned by `request_package_upload`. |
+
+**Returns:** `{ stagingId, status, fileName, fileSizeBytes, createdAt }`. Status values: `Pending`, `Ready`, `Forwarding`, `Expired`.
+
+#### `discard_package_stage`
+
+Cancels a staged upload and deletes any uploaded data.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `stagingId` | string | *(required)* | Staging ID to discard. |
 
 ---
 

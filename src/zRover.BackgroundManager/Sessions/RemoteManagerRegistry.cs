@@ -192,6 +192,129 @@ public sealed class RemoteManagerRegistry : IDisposable
         }
     }
 
+    /// <summary>
+    /// Routes a device-level tool call to the identified remote manager.
+    /// Strips the leading manager-ID segment from <paramref name="argsJson"/>'s
+    /// <c>deviceId</c> field automatically so each hop only sees a relative ID.
+    /// </summary>
+    /// <remarks>
+    /// Used by <c>DevicePackageManagementTools</c> to forward install/uninstall/launch/stop
+    /// and staging calls across federation hops without coupling the tool layer to
+    /// the MCP client internals.
+    /// </remarks>
+    public async Task<string> RouteDeviceToolAsync(
+        string deviceId,
+        string toolName,
+        string argsJson,
+        ILogger? logger = null,
+        CancellationToken ct = default)
+    {
+        // deviceId may be "a1b2" (direct) or "a1b2:c3d4:..." (deeper chain).
+        // We peel off the first segment to find our immediate connection;
+        // the residual becomes the downstream deviceId.
+        var colon = deviceId.IndexOf(':');
+        string managerId  = colon < 0 ? deviceId       : deviceId[..colon];
+        string residualId = colon < 0 ? ""              : deviceId[(colon + 1)..];
+
+        RemoteManagerConnection? connection;
+        lock (_lock)
+        {
+            if (!_managers.TryGetValue(managerId, out connection))
+                return System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    success = false,
+                    error = "MANAGER_NOT_FOUND",
+                    errorMessage = $"No remote manager with ID '{managerId}' is connected."
+                });
+        }
+
+        if (!connection.Info.IsConnected)
+            return System.Text.Json.JsonSerializer.Serialize(new
+            {
+                success = false,
+                error = "MANAGER_DISCONNECTED",
+                errorMessage = $"Remote manager '{connection.Alias}' ({managerId}) is currently disconnected."
+            });
+
+        // Rewrite argsJson: replace or remove the deviceId field
+        string rewrittenArgs;
+        try
+        {
+            rewrittenArgs = RewriteDeviceId(argsJson, string.IsNullOrEmpty(residualId) ? null : residualId);
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "Failed to rewrite args for RouteDeviceToolAsync");
+            rewrittenArgs = argsJson;
+        }
+
+        // Deserialise to the arg dict the MCP SDK expects
+        Dictionary<string, object?>? arguments = null;
+        if (!string.IsNullOrEmpty(rewrittenArgs) && rewrittenArgs != "{}")
+            arguments = System.Text.Json.JsonSerializer
+                .Deserialize<Dictionary<string, object?>>(rewrittenArgs);
+
+        try
+        {
+            logger?.LogDebug("Routing {Tool} to remote manager {Alias} ({ManagerId})",
+                toolName, connection.Alias, managerId);
+
+            var result = await connection.Client.CallToolAsync(toolName, arguments, cancellationToken: ct);
+            return result.Content.OfType<ModelContextProtocol.Protocol.TextContentBlock>()
+                       .FirstOrDefault()?.Text ?? "{}";
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            logger?.LogError(ex, "RouteDeviceToolAsync failed: {Tool} on manager {ManagerId}", toolName, managerId);
+            return System.Text.Json.JsonSerializer.Serialize(new
+            {
+                success = false,
+                error = "REMOTE_CALL_FAILED",
+                errorMessage = ex.Message
+            });
+        }
+    }
+
+    /// <summary>
+    /// Returns the MCP endpoint URL for a given manager ID, or <c>null</c> if not found.
+    /// Used by <c>DevicePackageManagementTools</c> to build downstream upload URLs.
+    /// </summary>
+    public string? GetManagerMcpUrl(string managerId)
+    {
+        lock (_lock)
+        {
+            return _managers.TryGetValue(managerId, out var conn) ? conn.McpUrl : null;
+        }
+    }
+
+    // ── Arg rewriting ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns a copy of <paramref name="argsJson"/> with the <c>deviceId</c> field
+    /// replaced by <paramref name="newDeviceId"/>, or removed when it is <c>null</c>.
+    /// </summary>
+    private static string RewriteDeviceId(string argsJson, string? newDeviceId)
+    {
+        using var doc = System.Text.Json.JsonDocument.Parse(argsJson);
+        var dict = new Dictionary<string, object?>();
+
+        foreach (var prop in doc.RootElement.EnumerateObject())
+        {
+            if (prop.Name.Equals("deviceId", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            dict[prop.Name] = prop.Value.ValueKind == System.Text.Json.JsonValueKind.String
+                ? prop.Value.GetString()
+                : (object?)prop.Value;
+        }
+
+        if (!string.IsNullOrEmpty(newDeviceId))
+            dict["deviceId"] = newDeviceId;
+
+        return System.Text.Json.JsonSerializer.Serialize(dict);
+    }
+
     /// <summary>Re-syncs the session list from a remote manager.</summary>
     public async Task ResyncAsync(string managerId, CancellationToken ct = default)
     {

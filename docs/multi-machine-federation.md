@@ -126,6 +126,114 @@ If the network connection to a remote manager drops, a background health check d
 
 ---
 
+## MSIX Package Management
+
+Background Manager exposes a set of MCP tools for installing, launching, stopping, and removing MSIX packages — both on the local machine and on any connected remote machine. The same `deviceId` routing that applies to app sessions applies here too.
+
+### Device IDs
+
+Every package management tool accepts an optional `deviceId` parameter:
+
+| `deviceId` value | Meaning |
+|---|---|
+| *(absent or `"local"`)* | Same machine the MCP client is talking to |
+| `"a1b2"` | The remote manager with that short ID |
+| `"a1b2:c3d4"` | A machine two hops away: first hop is `a1b2`, second hop is `c3d4` |
+
+Use `list_devices` to discover all reachable devices and their IDs.
+
+### Available Package Tools
+
+| Tool | Description |
+|---|---|
+| `list_devices` | Lists all reachable devices (local + all federated managers). |
+| `list_installed_packages` | Lists MSIX packages installed on a device. Supports name filter and framework/system package inclusion flags. |
+| `get_package_info` | Returns full metadata for one package: version, publisher, install location, app entries, capabilities, dependencies, and health status. |
+| `install_package` | Installs an MSIX from a URI (`https://`, `file://`, `ms-appinstaller://`) or from a staged upload (`staged://<stagingId>`). |
+| `uninstall_package` | Removes a package by family name. Optionally preserves app data or removes for all users. |
+| `launch_app` | Launches a specific app entry within a package by AUMID or app ID. Returns the new process ID. |
+| `stop_app` | Stops all running instances of a package. Supports graceful and forced termination. |
+| `request_package_upload` | Negotiates a one-time upload URL for sending an MSIX file to a specific device. In chained scenarios, the upload hops through every manager in the path. |
+| `get_package_stage_status` | Checks the status of a staged upload by staging ID. |
+| `discard_package_stage` | Cancels and deletes a staged upload. |
+
+### Installing an MSIX from a URI
+
+If the package is already accessible over the network or as a local file:
+
+```
+install_package(deviceId="a1b2", packageUri="https://example.com/MyApp.msix")
+install_package(packageUri="file:///C:/drops/MyApp.msix")
+install_package(packageUri="ms-appinstaller:?source=https://example.com/MyApp.appinstaller")
+```
+
+### Uploading an MSIX File
+
+Use this when the MSIX is not reachable at a network URL. The upload is coordinated through the manager chain so the file never needs to be directly reachable by the target device.
+
+**Step 1 — Request an upload slot:**
+
+```
+request_package_upload(
+  deviceId = "a1b2:c3d4",
+  fileName = "MyApp_1.0.0.0_x64.msix",
+  fileSizeBytes = 12345678,
+  sha256 = "abc123..."
+)
+```
+
+This returns:
+```json
+{
+  "stagingId": "s-abc123",
+  "uploadUrl": "http://192.168.1.10:5201/packages/stage/<token>",
+  "expiresAt": "2025-01-01T12:30:00Z"
+}
+```
+
+**Step 2 — POST the file to `uploadUrl`:**
+
+```http
+POST http://192.168.1.10:5201/packages/stage/<token>
+Content-Type: application/octet-stream
+Content-Length: 12345678
+
+<MSIX binary>
+```
+
+The upload token is single-use and expires after 30 minutes. No bearer token is required on this endpoint. In a multi-hop chain, the intermediate manager automatically forwards the upload to the next link.
+
+**Step 3 — Install from the staging area:**
+
+Once the upload completes (status `Ready`), install using the `staged://` scheme:
+
+```
+install_package(deviceId="a1b2:c3d4", packageUri="staged://s-abc123")
+```
+
+Staged files are automatically deleted 24 hours after upload.
+
+### Security Model
+
+- **Single-use upload tokens.** Each `request_package_upload` call generates a cryptographically random 256-bit (32-byte) URL token. The token is valid for exactly one `POST` upload.
+- **SHA-256 verification.** The file hash you declare in `request_package_upload` is checked after the upload. If it doesn't match, the upload is rejected with HTTP 422.
+- **Upload endpoint is separate from bearer auth.** The `/packages/stage/<token>` endpoint does not require the bearer authentication token. The upload URL is the credential — keep it secret.
+- **Hop-by-hop integrity.** In a multi-hop chain, SHA-256 is verified at each hop before the data is forwarded. A tampered file cannot pass a downstream manager.
+- **Automatic expiry.** Unuploaded tokens expire after 30 minutes; uploaded files expire after 24 hours. `PurgeExpired` runs on every health-check cycle.
+
+### Manifest Capabilities
+
+The Background Manager's `Package.appxmanifest` declares the restricted capabilities required for package management:
+
+```xml
+<rescap:Capability Name="appDiagnostics" />
+<rescap:Capability Name="packageManagement" />
+```
+
+`packageManagement` is required for install/uninstall via the WinRT `PackageManager` API. `appDiagnostics` is required for the graceful `stop_app` path (via `AppDiagnosticInfo`).
+
+---
+
 ## Things to Keep in Mind
 
 - **One active session per manager.** Each Background Manager (local or remote) has a single active session slot. Setting a remote session active affects that remote manager's state for all clients connected to it.
