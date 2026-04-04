@@ -20,6 +20,32 @@ Once your app is running, point any MCP client at `http://localhost:5100/mcp`:
 
 See [Connecting MCP Clients](docs/integration-guide.md#connecting-mcp-clients) for manual configuration for each client.
 
+## Install zRover Retriever
+
+zRover Retriever is the packaged Windows app that runs the MCP endpoint, manages package installs, and federates multi-device sessions. It is distributed as a signed MSIX via GitHub Releases.
+
+### One-time setup (run as admin, PowerShell)
+
+The package is signed with a self-signed certificate that must be trusted before installation.
+
+```powershell
+# 1. Trust the signing certificate (one-time, requires admin)
+$cer = "$env:TEMP\zRover.cer"
+Invoke-WebRequest https://github.com/arcadiogarcia/zRover/releases/latest/download/zRover.Retriever_0.5.0.0_x64.cer -OutFile $cer
+Import-Certificate -FilePath $cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
+Remove-Item $cer
+
+# 2. Install (or update) the MSIX
+$msix = "$env:TEMP\zRover.Retriever.msix"
+Invoke-WebRequest https://github.com/arcadiogarcia/zRover/releases/latest/download/zRover.Retriever_0.5.0.0_x64.msix -OutFile $msix
+Add-AppxPackage $msix
+Remove-Item $msix
+```
+
+> **Updating:** Run only step 2 for subsequent releases. The certificate only needs to be trusted once per machine.
+
+Download links and release notes for all versions are on the [Releases page](https://github.com/arcadiogarcia/zRover/releases).
+
 ## Architecture
 
 ```
@@ -73,6 +99,7 @@ MCP Client (tests, AI agents, etc.)
 | **zRover.Uwp** | UAP 10.0.19041 | UWP class library — debug host, capabilities, AppService handler, coordinate resolver |
 | **zRover.Uwp.Sample** | UAP 10.0.19041 | Sample UWP app with Color Picker test UI for E2E testing |
 | **zRover.FullTrust.McpServer** | net8.0-windows | Out-of-process MCP HTTP server, bridges to UWP via AppService IPC |
+| **zRover.Retriever** | net9.0-windows | Packaged WinAppSDK service: MCP endpoint (port 5200), package management, session federation. See [Retriever Developer Guide](docs/retriever-dev-guide.md) |
 | **zRover.Mcp.IntegrationTests** | net8.0 | 55 xUnit tests (unit + E2E) |
 
 ## MCP Tools
@@ -85,8 +112,10 @@ See the **[full tool reference](docs/integration-guide.md#available-tools)** for
 
 - **Windows 10/11** (Desktop)
 - **Visual Studio 2022** with the UWP workload
-- **.NET 8 SDK**
+- **.NET 9 SDK** (required for the Retriever; .NET 8 SDK also needed for the FullTrust server)
 - **Developer Mode** enabled in Windows Settings → Privacy & Security → For Developers
+
+For Retriever-specific build and deployment instructions see the **[Retriever Developer Guide](docs/retriever-dev-guide.md)**.
 
 ## Building
 
