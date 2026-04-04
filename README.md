@@ -29,15 +29,20 @@ zRover Retriever is the packaged Windows app that runs the MCP endpoint, manages
 The package is signed with a self-signed certificate that must be trusted before installation.
 
 ```powershell
+# Resolve latest release asset URLs from GitHub API
+$release = Invoke-RestMethod https://api.github.com/repos/arcadiogarcia/zRover/releases/latest
+$cerUrl  = ($release.assets | Where-Object { $_.name -like '*.cer'  }).browser_download_url
+$msixUrl = ($release.assets | Where-Object { $_.name -like '*.msix' }).browser_download_url
+
 # 1. Trust the signing certificate (one-time, requires admin)
 $cer = "$env:TEMP\zRover.cer"
-Invoke-WebRequest https://github.com/arcadiogarcia/zRover/releases/latest/download/zRover.Retriever_0.5.0.0_x64.cer -OutFile $cer
+Invoke-WebRequest $cerUrl -OutFile $cer
 Import-Certificate -FilePath $cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
 Remove-Item $cer
 
 # 2. Install (or update) the MSIX
 $msix = "$env:TEMP\zRover.Retriever.msix"
-Invoke-WebRequest https://github.com/arcadiogarcia/zRover/releases/latest/download/zRover.Retriever_0.5.0.0_x64.msix -OutFile $msix
+Invoke-WebRequest $msixUrl -OutFile $msix
 Add-AppxPackage $msix
 Remove-Item $msix
 ```
