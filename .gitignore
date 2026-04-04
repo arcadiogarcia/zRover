@@ -15,6 +15,10 @@ obj/
 *.nuget.props
 *.nuget.targets
 
+## Rover source folders that happen to be named "Packages"
+!src/**/Packages/
+!src/**/Packages/**
+
 ## Build results
 [Dd]ebug/
 [Rr]elease/

@@ -5,6 +5,7 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 using Windows.ApplicationModel.DataTransfer;
+using zRover.BackgroundManager.Packages;
 using zRover.BackgroundManager.Server;
 using zRover.BackgroundManager.Sessions;
 using zRover.Core.Sessions;
@@ -16,6 +17,7 @@ public sealed partial class MainWindow : Window
     private readonly SessionRegistry _registry;
     private readonly RemoteManagerRegistry _managers;
     private readonly ExternalAccessManager _external;
+    private readonly PackageInstallManager _packageInstall;
     private readonly IConfiguration _config;
     private readonly DispatcherQueue _dispatcherQueue;
 
@@ -28,6 +30,7 @@ public sealed partial class MainWindow : Window
         _registry = services.GetRequiredService<SessionRegistry>();
         _managers = services.GetRequiredService<RemoteManagerRegistry>();
         _external = services.GetRequiredService<ExternalAccessManager>();
+        _packageInstall = services.GetRequiredService<PackageInstallManager>();
         _config = services.GetRequiredService<IConfiguration>();
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
 
@@ -35,6 +38,7 @@ public sealed partial class MainWindow : Window
         _registry.ActiveSessionChanged += OnActiveSessionChanged;
         _managers.ManagersChanged += OnManagersChanged;
         _external.StateChanged += OnExternalStateChanged;
+        _packageInstall.StateChanged += OnPackageInstallStateChanged;
         Closed += OnClosed;
 
         RefreshState();
@@ -46,6 +50,7 @@ public sealed partial class MainWindow : Window
         _registry.ActiveSessionChanged -= OnActiveSessionChanged;
         _managers.ManagersChanged -= OnManagersChanged;
         _external.StateChanged -= OnExternalStateChanged;
+        _packageInstall.StateChanged -= OnPackageInstallStateChanged;
     }
 
     private void OnSessionsChanged(object? sender, EventArgs e) =>
@@ -59,6 +64,9 @@ public sealed partial class MainWindow : Window
 
     private void OnExternalStateChanged(object? sender, EventArgs e) =>
         _dispatcherQueue.TryEnqueue(RefreshExternalState);
+
+    private void OnPackageInstallStateChanged(object? sender, EventArgs e) =>
+        _dispatcherQueue.TryEnqueue(RefreshPackageInstallState);
 
     private void RefreshState()
     {
@@ -99,6 +107,14 @@ public sealed partial class MainWindow : Window
         NoManagersText.Visibility = managerItems.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
 
         RefreshExternalState();
+        RefreshPackageInstallState();
+    }
+
+    private void RefreshPackageInstallState()
+    {
+        PackageInstallToggle.Toggled -= OnPackageInstallToggled;
+        PackageInstallToggle.IsOn = _packageInstall.IsEnabled;
+        PackageInstallToggle.Toggled += OnPackageInstallToggled;
     }
 
     private void RefreshExternalState()
@@ -123,6 +139,14 @@ public sealed partial class MainWindow : Window
             await _external.EnableAsync();
         else
             await _external.DisableAsync();
+    }
+
+    private async void OnPackageInstallToggled(object sender, RoutedEventArgs e)
+    {
+        if (PackageInstallToggle.IsOn)
+            await _packageInstall.EnableAsync();
+        else
+            _packageInstall.Disable();
     }
 
     private void OnCopyLinkClicked(object sender, RoutedEventArgs e)

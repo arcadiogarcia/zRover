@@ -47,6 +47,12 @@ public class Program
                         case "disable-external":
                             writer.WriteLine("disable-external");
                             break;
+                        case "enable-package-install":
+                            writer.WriteLine("enable-package-install");
+                            break;
+                        case "disable-package-install":
+                            writer.WriteLine("disable-package-install");
+                            break;
                         case "connect":
                             var url = query["url"] ?? "";
                             var token = query["token"];
@@ -77,6 +83,9 @@ public class Program
         builder.Services.AddSingleton<ExternalAccessManager>();
         builder.Services.AddSingleton<RemoteManagerRegistry>();
         builder.Services.AddSingleton<PackageStagingManager>();
+        builder.Services.AddSingleton<DevCertManager>();
+        builder.Services.AddSingleton<IDevCertManager>(sp => sp.GetRequiredService<DevCertManager>());
+        builder.Services.AddSingleton<PackageInstallManager>();
         builder.Services.AddSingleton<IDevicePackageManager, LocalDevicePackageManager>();
         builder.Services.AddHostedService<Worker>();
 
@@ -103,7 +112,9 @@ public class Program
 
         SessionManagementTools.Register(adapter, sessions);
         DevicePackageManagementTools.Register(
-            adapter, localPkgMgr, stagingManager, remoteMgrs, extAccess, pkgLogger);
+            adapter, localPkgMgr, stagingManager, remoteMgrs, extAccess,
+            webApp.Services.GetRequiredService<PackageInstallManager>(),
+            pkgLogger);
 
         var mcpOptions = webApp.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<McpServerOptions>>().Value;
         mcpOptions.ToolCollection = adapter.Tools;

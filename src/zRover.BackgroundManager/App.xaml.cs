@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppNotifications;
+using zRover.BackgroundManager.Packages;
 using zRover.BackgroundManager.Server;
 using zRover.BackgroundManager.Sessions;
 
@@ -151,6 +152,19 @@ public partial class App : Application
                     await external.DisableAsync();
                     log?.LogInformation("External access disabled via pipe command");
                 }
+                else if (message == "enable-package-install")
+                {
+                    var pkgInstall = Services.GetRequiredService<PackageInstallManager>();
+                    await pkgInstall.EnableAsync();
+                    log?.LogInformation("Package install enabled via pipe command");
+                    _dispatcherQueue?.TryEnqueue(ShowMainWindow);
+                }
+                else if (message == "disable-package-install")
+                {
+                    var pkgInstall = Services.GetRequiredService<PackageInstallManager>();
+                    pkgInstall.Disable();
+                    log?.LogInformation("Package install disabled via pipe command");
+                }
                 else if (message.StartsWith("connect:"))
                 {
                     // Format: connect:{url} or connect:{url}:{token}
@@ -216,6 +230,21 @@ public partial class App : Application
                         var external = Services.GetRequiredService<ExternalAccessManager>();
                         await external.DisableAsync();
                         log?.LogInformation("External access disabled via protocol activation");
+                        break;
+                    }
+                    case "enable-package-install":
+                    {
+                        var pkgInstall = Services.GetRequiredService<PackageInstallManager>();
+                        await pkgInstall.EnableAsync();
+                        log?.LogInformation("Package install enabled via protocol activation");
+                        _dispatcherQueue?.TryEnqueue(ShowMainWindow);
+                        break;
+                    }
+                    case "disable-package-install":
+                    {
+                        var pkgInstall = Services.GetRequiredService<PackageInstallManager>();
+                        pkgInstall.Disable();
+                        log?.LogInformation("Package install disabled via protocol activation");
                         break;
                     }
                     case "connect":

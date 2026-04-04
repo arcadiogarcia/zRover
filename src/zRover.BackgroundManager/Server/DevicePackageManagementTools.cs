@@ -57,16 +57,17 @@ public static class DevicePackageManagementTools
         PackageStagingManager stagingManager,
         RemoteManagerRegistry remoteManagers,
         ExternalAccessManager externalAccess,
+        PackageInstallManager packageInstall,
         ILogger logger)
     {
         RegisterListDevices(registry, remoteManagers);
         RegisterListInstalledPackages(registry, localPackageManager, remoteManagers, logger);
-        RegisterInstallPackage(registry, localPackageManager, remoteManagers, logger);
-        RegisterUninstallPackage(registry, localPackageManager, remoteManagers, logger);
+        RegisterInstallPackage(registry, localPackageManager, remoteManagers, packageInstall, logger);
+        RegisterUninstallPackage(registry, localPackageManager, remoteManagers, packageInstall, logger);
         RegisterLaunchApp(registry, localPackageManager, remoteManagers, logger);
         RegisterStopApp(registry, localPackageManager, remoteManagers, logger);
         RegisterGetPackageInfo(registry, localPackageManager, remoteManagers, logger);
-        RegisterRequestPackageUpload(registry, stagingManager, remoteManagers, externalAccess, logger);
+        RegisterRequestPackageUpload(registry, stagingManager, remoteManagers, externalAccess, packageInstall, logger);
         RegisterGetPackageStageStatus(registry, stagingManager, remoteManagers, logger);
         RegisterDiscardPackageStage(registry, stagingManager, remoteManagers, logger);
     }
@@ -175,6 +176,7 @@ public static class DevicePackageManagementTools
         IMcpToolRegistry registry,
         IDevicePackageManager local,
         RemoteManagerRegistry remoteManagers,
+        PackageInstallManager packageInstall,
         ILogger logger)
     {
         registry.RegisterTool(
@@ -235,6 +237,13 @@ public static class DevicePackageManagementTools
                         BuildArgsWithDownstreamStaging(root, packageUri), logger);
                 }
 
+                if (!packageInstall.IsEnabled)
+                    return JsonSerializer.Serialize(new
+                    {
+                        success = false, error = "PACKAGE_INSTALL_DISABLED",
+                        errorMessage = "Package installation is disabled on this device. Enable it in the zRover Background Manager UI or via zrover://enable-package-install."
+                    }, JsonOpts);
+
                 var options = new InstallOptions
                 {
                     DependencyUris    = depUris,
@@ -257,6 +266,7 @@ public static class DevicePackageManagementTools
         IMcpToolRegistry registry,
         IDevicePackageManager local,
         RemoteManagerRegistry remoteManagers,
+        PackageInstallManager packageInstall,
         ILogger logger)
     {
         registry.RegisterTool(
@@ -292,6 +302,13 @@ public static class DevicePackageManagementTools
                 if (IsRemote(deviceId, out var remoteId))
                     return await remoteManagers.RouteDeviceToolAsync(
                         remoteId!, "uninstall_package", BuildArgs(root, excludeDeviceId: true), logger);
+
+                if (!packageInstall.IsEnabled)
+                    return JsonSerializer.Serialize(new
+                    {
+                        success = false, error = "PACKAGE_INSTALL_DISABLED",
+                        errorMessage = "Package installation is disabled on this device. Enable it in the zRover Background Manager UI or via zrover://enable-package-install."
+                    }, JsonOpts);
 
                 var result = await local.UninstallPackageAsync(
                     GetString(root, "packageFamilyName") ?? "",
@@ -457,6 +474,7 @@ public static class DevicePackageManagementTools
         PackageStagingManager staging,
         RemoteManagerRegistry remoteManagers,
         ExternalAccessManager externalAccess,
+        PackageInstallManager packageInstall,
         ILogger logger)
     {
         registry.RegisterTool(
@@ -531,6 +549,13 @@ public static class DevicePackageManagementTools
                     }
                     else
                     {
+                        if (!packageInstall.IsEnabled)
+                            return JsonSerializer.Serialize(new
+                            {
+                                success = false, error = "PACKAGE_INSTALL_DISABLED",
+                                errorMessage = "Package installation is disabled on this device. Enable it in the zRover Background Manager UI or via zrover://enable-package-install."
+                            }, JsonOpts);
+
                         ticket = staging.CreateLocalStage(filename, sha256, sizeBytes);
                     }
 

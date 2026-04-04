@@ -32,6 +32,10 @@
   <ItemGroup>
     <Compile Include="..\zRover.BackgroundManager\Packages\PackageStagingManager.cs"
              LinkBase="Packages" />
+    <Compile Include="..\zRover.BackgroundManager\Packages\IDevCertManager.cs"
+             LinkBase="Packages" />
+    <Compile Include="..\zRover.BackgroundManager\Packages\PackageInstallManager.cs"
+             LinkBase="Packages" />
     <Compile Include="..\zRover.BackgroundManager\Server\PackageStagingEndpoint.cs"
              LinkBase="Server" />
   </ItemGroup>

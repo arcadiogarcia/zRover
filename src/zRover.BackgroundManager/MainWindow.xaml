@@ -11,6 +11,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -46,8 +47,16 @@
             </StackPanel>
         </StackPanel>
 
-        <!-- Remote Managers -->
+        <!-- Package Installation -->
         <StackPanel Grid.Row="3" Spacing="8">
+            <TextBlock Text="Package Installation" Style="{StaticResource SubtitleTextBlockStyle}"/>
+            <ToggleSwitch x:Name="PackageInstallToggle"
+                          Header="Allow MCP clients to install/uninstall packages"
+                          Toggled="OnPackageInstallToggled"/>
+        </StackPanel>
+
+        <!-- Remote Managers -->
+        <StackPanel Grid.Row="4" Spacing="8">
             <TextBlock Text="Remote Managers" Style="{StaticResource SubtitleTextBlockStyle}"/>
             <ListView x:Name="ManagersList" MaxHeight="120">
                 <ListView.ItemTemplate>
@@ -73,7 +82,7 @@
         </StackPanel>
 
         <!-- Sessions -->
-        <Grid Grid.Row="4">
+        <Grid Grid.Row="5">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
