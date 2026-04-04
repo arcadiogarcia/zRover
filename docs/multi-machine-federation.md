@@ -1,12 +1,12 @@
 # Multi-Machine Federation
 
-Rover Background Manager supports connecting multiple machines together so that a single MCP client can discover and control apps running across all of them. You point your AI tool (such as Copilot) at one machine — the **root** — and it sees apps on every other machine that has been linked to it.
+Rover Retriever supports connecting multiple machines together so that a single MCP client can discover and control apps running across all of them. You point your AI tool (such as Copilot) at one machine — the **root** — and it sees apps on every other machine that has been linked to it.
 
 ---
 
 ## How It Works
 
-Each machine runs its own Background Manager. Normally a manager only listens on `localhost` and is not reachable over the network. Federation works by:
+Each machine runs its own Retriever. Normally a manager only listens on `localhost` and is not reachable over the network. Federation works by:
 
 1. **Machine B** opts in to external access, which opens a network listener and generates a one-time bearer token.
 2. **Machine A** connects to Machine B using that token. Machine A's manager becomes an MCP client of Machine B's manager.
@@ -35,11 +35,11 @@ Chains can be deeper: Machine B can itself be connected to Machine D, and Machin
 
 ## Enabling External Access
 
-By default, a Background Manager only accepts connections from the same machine. To allow other managers to connect, you need to explicitly enable external access.
+By default, a Retriever only accepts connections from the same machine. To allow other managers to connect, you need to explicitly enable external access.
 
 ### Via the dashboard
 
-Open the Background Manager window and flip the **Allow external connections** toggle. The manager will:
+Open the Retriever window and flip the **Allow external connections** toggle. The manager will:
 
 - Start listening on your local network IP (port 5201 by default)
 - Generate a fresh bearer token
@@ -68,7 +68,7 @@ On Windows, you can run these from a browser address bar, a Run dialog, or with 
 
 On the machine you want to act as the root (Machine A), open the dashboard and use the **Remote Managers** section.
 
-**Using a connection link:** Open the `zrover://connect?url=...&token=...` link that was generated and copied on Machine B. This can be clicked in a browser or passed as a command-line argument to the Background Manager executable. The connection is established automatically.
+**Using a connection link:** Open the `zrover://connect?url=...&token=...` link that was generated and copied on Machine B. This can be clicked in a browser or passed as a command-line argument to the Retriever executable. The connection is established automatically.
 
 Once connected, Machine B's apps appear in the sessions list with a `(via Machine-B)` label. They are immediately available to any MCP client connected to Machine A.
 
@@ -128,7 +128,7 @@ If the network connection to a remote manager drops, a background health check d
 
 ## MSIX Package Management
 
-Background Manager exposes a set of MCP tools for installing, launching, stopping, and removing MSIX packages — both on the local machine and on any connected remote machine. The same `deviceId` routing that applies to app sessions applies here too.
+Retriever exposes a set of MCP tools for installing, launching, stopping, and removing MSIX packages — both on the local machine and on any connected remote machine. The same `deviceId` routing that applies to app sessions applies here too.
 
 ### Device IDs
 
@@ -223,7 +223,7 @@ Staged files are automatically deleted 24 hours after upload.
 
 ### Manifest Capabilities
 
-The Background Manager's `Package.appxmanifest` declares the restricted capabilities required for package management:
+The Retriever's `Package.appxmanifest` declares the restricted capabilities required for package management:
 
 ```xml
 <rescap:Capability Name="appDiagnostics" />
@@ -236,7 +236,7 @@ The Background Manager's `Package.appxmanifest` declares the restricted capabili
 
 ## Things to Keep in Mind
 
-- **One active session per manager.** Each Background Manager (local or remote) has a single active session slot. Setting a remote session active affects that remote manager's state for all clients connected to it.
+- **One active session per manager.** Each Retriever (local or remote) has a single active session slot. Setting a remote session active affects that remote manager's state for all clients connected to it.
 - **Tool schema is uniform.** All Rover apps expose the same tools regardless of which machine they are on, so you don't need to think about schema differences when switching sessions.
 - **Large payloads (screenshots, etc.) flow through the chain.** Screenshots are base64-encoded in the tool response and travel through each manager hop. On slow networks, large captures from deeply chained machines may take longer.
 - **Disconnecting a manager removes its sessions.** When you disconnect a remote manager from the dashboard, all of its propagated sessions are removed from your local list immediately.

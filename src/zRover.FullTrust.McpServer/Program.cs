@@ -68,7 +68,7 @@ class Program
                     backend.InvokeToolAsync(capturedName, argsJson)));
         }
 
-        // Register with the BackgroundManager if a manager URL was provided.
+        // Register with the Retriever if a manager URL was provided.
         // Do this after the MCP server is about to start so the manager can connect back immediately.
         if (managerUrl != null)
         {
@@ -110,7 +110,7 @@ class Program
     }
 
     /// <summary>
-    /// POSTs registration to the BackgroundManager with exponential backoff.
+    /// POSTs registration to the Retriever with exponential backoff.
     /// Runs fire-and-forget so it doesn't block the MCP server startup.
     /// </summary>
     private static async Task RegisterWithManagerAsync(
@@ -132,7 +132,7 @@ class Program
                 response.EnsureSuccessStatusCode();
 
                 var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-                Console.Error.WriteLine($"[McpServer] Registered with BackgroundManager. Response: {responseBody}");
+                Console.Error.WriteLine($"[McpServer] Registered with Retriever. Response: {responseBody}");
                 return;
             }
             catch (OperationCanceledException)
@@ -147,7 +147,7 @@ class Program
             }
         }
 
-        Console.Error.WriteLine("[McpServer] Could not reach BackgroundManager after all attempts — running standalone.");
+        Console.Error.WriteLine("[McpServer] Could not reach Retriever after all attempts — running standalone.");
     }
 }
 

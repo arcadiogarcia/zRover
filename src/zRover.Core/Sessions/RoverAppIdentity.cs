@@ -2,7 +2,7 @@ namespace zRover.Core.Sessions
 {
     /// <summary>
     /// Immutable identity for a Rover-instrumented app instance.
-    /// Provided by the app when it registers with the BackgroundManager.
+    /// Provided by the app when it registers with the Retriever.
     /// </summary>
     public sealed class RoverAppIdentity
     {

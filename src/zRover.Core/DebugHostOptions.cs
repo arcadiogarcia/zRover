@@ -54,7 +54,7 @@ namespace zRover.Core
         public bool EnableWaitFor { get; set; } = true;
 
         /// <summary>
-        /// Base URL of the <c>zRover.BackgroundManager</c> superset MCP server.
+        /// Base URL of the <c>zRover.Retriever</c> superset MCP server.
         /// When set, the FullTrust companion process will register this app instance
         /// with the manager on startup so that it appears in the manager's session list.
         /// Example: <c>http://localhost:5200</c>

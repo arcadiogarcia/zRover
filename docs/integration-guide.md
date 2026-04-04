@@ -29,7 +29,7 @@ Add AI-driven UI automation to any UWP app. zRover exposes your app's screen and
   - [UI Tree Tools](#ui-tree-tools)
   - [Window Tools](#window-tools)
   - [Wait Tools](#wait-tools)
-  - [Background Manager: Package Management Tools](#background-manager-package-management-tools)
+  - [Retriever: Package Management Tools](#background-manager-package-management-tools)
 - [Coordinate Spaces](#coordinate-spaces)
 - [Preview & Dry Run](#preview--dry-run)
 - [Requirements & Limitations](#requirements--limitations)
@@ -293,7 +293,7 @@ var tools = await client.ListToolsAsync();
 
 ## Available Tools
 
-zRover registers **22 tools** organized across screenshot capture, touch/mouse, keyboard, pen, gamepad input, app-defined action dispatch, logging, UI tree inspection, window management, and condition polling. The Background Manager additionally exposes **10 package management tools** (see [Background Manager: Package Management Tools](#background-manager-package-management-tools)).
+zRover registers **22 tools** organized across screenshot capture, touch/mouse, keyboard, pen, gamepad input, app-defined action dispatch, logging, UI tree inspection, window management, and condition polling. The Retriever additionally exposes **10 package management tools** (see [Retriever: Package Management Tools](#background-manager-package-management-tools)).
 
 ### Screenshot Tools
 
@@ -736,15 +736,15 @@ Blocks until a condition is met or the timeout expires. Use this to synchronize 
 
 ---
 
-### Background Manager: Package Management Tools
+### Retriever: Package Management Tools
 
-The Background Manager exposes 10 additional MCP tools for MSIX package management. These tools are available on the Background Manager's MCP endpoint (port 5200 by default) and support multi-device routing via the `deviceId` parameter.
+The Retriever exposes 10 additional MCP tools for MSIX package management. These tools are available on the Retriever's MCP endpoint (port 5200 by default) and support multi-device routing via the `deviceId` parameter.
 
 For full documentation of the upload flow, hop-by-hop forwarding, and security model, see the [MSIX Package Management](multi-machine-federation.md#msix-package-management) section in the Multi-Machine Federation guide.
 
 #### `list_devices`
 
-Lists all devices reachable from this Background Manager instance (local device plus all federated remote managers).
+Lists all devices reachable from this Retriever instance (local device plus all federated remote managers).
 
 **Parameters:** none
 

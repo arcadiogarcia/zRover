@@ -6,13 +6,13 @@ using System.Threading.Tasks;
 namespace zRover.Core.Sessions
 {
     /// <summary>
-    /// Represents one connected app instance managed by the BackgroundManager.
+    /// Represents one connected app instance managed by the Retriever.
     /// Each session wraps an MCP client connection to a per-app zRover MCP server.
     /// </summary>
     public interface IRoverSession
     {
         /// <summary>
-        /// Opaque identifier assigned by the BackgroundManager when the session registers.
+        /// Opaque identifier assigned by the Retriever when the session registers.
         /// Stable for the lifetime of this connection; a new SessionId is issued on reconnect.
         /// </summary>
         string SessionId { get; }
