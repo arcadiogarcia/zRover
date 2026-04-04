@@ -1,0 +1,90 @@
+name: Release Retriever
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*.[0-9]*.[0-9]*.[0-9]*'   # matches v1.0.0.0, v1.2.3.4, etc.
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    permissions:
+      contents: write   # needed to create GitHub releases and upload assets
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.x'
+
+      # ── Restore NuGet packages (pulls microsoft.windows.sdk.buildtools
+      #    which contains makeappx.exe — no Windows SDK install needed on CI)
+      - name: Restore NuGet packages
+        run: dotnet restore src/zRover.Retriever/zRover.Retriever.csproj
+
+      # ── Locate signtool from the Windows SDK pre-installed on windows-latest
+      - name: Locate signtool
+        id: signtool
+        shell: pwsh
+        run: |
+          $st = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' `
+              -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue |
+              Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $st) { throw 'signtool.exe not found on runner' }
+          Write-Host "signtool: $st"
+          echo "path=$st" >> $env:GITHUB_OUTPUT
+
+      # ── Import the PFX signing cert from repository secret
+      - name: Import signing cert
+        shell: pwsh
+        env:
+          PFX_B64: ${{ secrets.SIGNING_CERT_PFX_B64 }}
+          PFX_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
+        run: |
+          $pfxPath = Join-Path $env:RUNNER_TEMP 'signing.pfx'
+          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:PFX_B64))
+          $secPwd = ConvertTo-SecureString $env:PFX_PASSWORD -AsPlainText -Force
+          $cert = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $secPwd
+          Remove-Item $pfxPath
+          Write-Host "Cert imported (thumb: $($cert.Thumbprint))"
+          echo "SIGNING_CERT_THUMBPRINT=$($cert.Thumbprint)" >> $env:GITHUB_ENV
+
+      # ── Patch manifest version from tag (strips leading 'v')
+      - name: Patch manifest version
+        shell: pwsh
+        run: |
+          $v = '${{ github.ref_name }}'.TrimStart('v')
+          $mf = 'src/zRover.Retriever/Package.appxmanifest'
+          $xml = [xml](Get-Content $mf -Raw)
+          $ns = @{ a = 'http://schemas.microsoft.com/appx/manifest/foundation/windows10' }
+          (Select-Xml -Xml $xml -XPath '/a:Package/a:Identity' -Namespace $ns).Node.Version = $v
+          $xml.Save((Resolve-Path $mf))
+          Write-Host "Manifest version set to $v"
+
+      # ── Build, pack, sign, generate .appinstaller — no install
+      - name: Build and package
+        shell: pwsh
+        run: |
+          src/zRover.Retriever/deploy-dev.ps1 -Config Release -SkipInstall
+
+      # ── Parse version from tag (strip leading 'v')
+      - name: Get version
+        id: ver
+        shell: pwsh
+        run: |
+          $v = '${{ github.ref_name }}'.TrimStart('v')
+          echo "version=$v" >> $env:GITHUB_OUTPUT
+
+      # ── Create GitHub Release and upload all three assets
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "zRover Retriever v${{ steps.ver.outputs.version }}"
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            src/zRover.Retriever/bin/Release/zRover.Retriever_${{ steps.ver.outputs.version }}_x64.msix
+            src/zRover.Retriever/bin/Release/zRover.Retriever_${{ steps.ver.outputs.version }}_x64.cer
+            src/zRover.Retriever/bin/Release/zRover.Retriever.appinstaller
