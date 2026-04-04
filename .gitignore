@@ -84,3 +84,8 @@ Desktop.ini
 
 ## slnx (we use traditional .sln)
 *.slnx
+
+# MSBuild diagnostics
+*.binlog
+msbuild-*.txt
+

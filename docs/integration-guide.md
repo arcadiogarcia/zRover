@@ -29,7 +29,7 @@ Add AI-driven UI automation to any UWP app. zRover exposes your app's screen and
   - [UI Tree Tools](#ui-tree-tools)
   - [Window Tools](#window-tools)
   - [Wait Tools](#wait-tools)
-  - [Retriever: Package Management Tools](#background-manager-package-management-tools)
+  - [Retriever: Package Management Tools](#retriever-package-management-tools)
 - [Coordinate Spaces](#coordinate-spaces)
 - [Preview & Dry Run](#preview--dry-run)
 - [Requirements & Limitations](#requirements--limitations)

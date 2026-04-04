@@ -18,16 +18,11 @@
     <WindowsAppSdkBootstrapInitialize>false</WindowsAppSdkBootstrapInitialize>
     <WindowsAppSdkDeploymentManagerInitialize>false</WindowsAppSdkDeploymentManagerInitialize>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsPackageType>MSIX</WindowsPackageType>
+    <AppxBundle>Never</AppxBundle>
+    <UapAppxPackageBuildMode>SideloadOnly</UapAppxPackageBuildMode>
+    <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
   </PropertyGroup>
-
-  <!-- Auto-register as loose-file MSIX after build (Developer Mode required) -->
-  <Target Name="_DeployDevPackage" AfterTargets="Build"
-          Condition="'$(BuildingInsideVisualStudio)' == 'true'">
-    <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)deploy-dev.ps1&quot; -Config $(Configuration)"
-          WorkingDirectory="$(MSBuildThisFileDirectory)"
-          IgnoreExitCode="true" />
-  </Target>
 
   <ItemGroup>
     <Content Remove="Assets\**" />
