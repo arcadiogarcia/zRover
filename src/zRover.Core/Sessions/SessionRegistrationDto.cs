@@ -2,7 +2,7 @@ namespace zRover.Core.Sessions
 {
     /// <summary>
     /// HTTP body sent by a per-app zRover MCP server to register itself with
-    /// the BackgroundManager at startup.
+    /// the Retriever at startup.
     /// POST {managerUrl}/sessions/register
     /// </summary>
     public sealed class SessionRegistrationRequest
@@ -20,9 +20,9 @@ namespace zRover.Core.Sessions
         public string? InstanceId { get; set; }
 
         /// <summary>
-        /// Full URL of the per-app MCP server endpoint the BackgroundManager
+        /// Full URL of the per-app MCP server endpoint the Retriever
         /// should connect its MCP client to (e.g. "http://hostname:5100/mcp").
-        /// Must be reachable from the BackgroundManager process (supports cross-machine).
+        /// Must be reachable from the Retriever process (supports cross-machine).
         /// </summary>
         public string McpUrl { get; set; } = "";
     }
@@ -31,7 +31,7 @@ namespace zRover.Core.Sessions
     public sealed class SessionRegistrationResponse
     {
         /// <summary>
-        /// Opaque session ID assigned by the BackgroundManager.
+        /// Opaque session ID assigned by the Retriever.
         /// The per-app server may log this for diagnostics.
         /// </summary>
         public string SessionId { get; set; } = "";

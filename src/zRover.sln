@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
 VisualStudioVersion = 18.4.11620.152
@@ -13,11 +13,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "zRover.Uwp.Sample", "zRover
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "zRover.FullTrust.McpServer", "zRover.FullTrust.McpServer\zRover.FullTrust.McpServer.csproj", "{A1270005-B000-4000-8000-000000000005}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "zRover.BackgroundManager", "zRover.BackgroundManager\zRover.BackgroundManager.csproj", "{A1270006-B000-4000-8000-000000000006}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "zRover.Retriever", "zRover.Retriever\zRover.Retriever.csproj", "{A1270006-B000-4000-8000-000000000006}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "zRover.Mcp.IntegrationTests", "zRover.Mcp.IntegrationTests\zRover.Mcp.IntegrationTests.csproj", "{B1EF728C-FBC0-4720-A246-B0BF295C703A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "zRover.BackgroundManager.Tests", "zRover.BackgroundManager.Tests\zRover.BackgroundManager.Tests.csproj", "{C16374F2-CA3A-418D-8B88-9FC9935F730D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "zRover.Retriever.Tests", "zRover.Retriever.Tests\zRover.Retriever.Tests.csproj", "{C16374F2-CA3A-418D-8B88-9FC9935F730D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

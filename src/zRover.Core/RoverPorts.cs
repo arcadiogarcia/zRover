@@ -18,7 +18,7 @@ public static class RoverPorts
     public const int App = 5100;
 
     /// <summary>
-    /// Default port for the <c>zRover.BackgroundManager</c> superset MCP server.
+    /// Default port for the <c>zRover.Retriever</c> superset MCP server.
     /// Kept separate from <see cref="App"/> so the manager and a single running
     /// app instance can both use their predictable ports without collision.
     /// </summary>

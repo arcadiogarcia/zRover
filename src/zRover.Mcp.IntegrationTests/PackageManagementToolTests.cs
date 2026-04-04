@@ -7,10 +7,10 @@ namespace zRover.Mcp.IntegrationTests;
 
 /// <summary>
 /// Integration tests for the device package management MCP tools exposed by the
-/// Background Manager (<c>http://localhost:5200/mcp</c>).
+/// Retriever (<c>http://localhost:5200/mcp</c>).
 ///
 /// Prerequisites:
-///   1. zRover.BackgroundManager is running (port 5200).
+///   1. zRover.Retriever is running (port 5200).
 ///   2. Run: dotnet test --filter "PackageManagementToolTests"
 ///
 /// These tests verify the tool schemas are present and that the tools return
@@ -364,21 +364,8 @@ public class PackageManagementToolTests : IAsyncLifetime
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
-    private static string GetText(ModelContextProtocol.Client.CallToolResult result)
+    private static string GetText(ModelContextProtocol.Protocol.CallToolResult result)
         => result.Content.OfType<TextContentBlock>().FirstOrDefault()?.Text ?? "{}";
 }
 
-// SkippableFact attribute for conditional tests
-[AttributeUsage(AttributeTargets.Method)]
-file sealed class SkippableFactAttribute : FactAttribute
-{
-    public override string? Skip { get; set; }
-}
 
-file static class SkipExtension
-{
-    public static void IfNot(bool condition, string reason)
-    {
-        if (!condition) throw new Xunit.SkipException(reason);
-    }
-}
