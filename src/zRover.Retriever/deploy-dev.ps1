@@ -46,11 +46,37 @@ Write-Host "Publishing ($Config|$Arch)..."
 dotnet publish $ProjectFile -c $Config -r $Rid --no-self-contained
 if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed' }
 
-# WinAppSDK assembles the full MSIX layout (AppxManifest, XBF, PRI, Assets,
-# binaries) into bin\Deploy\<Config>-<Arch> as part of the publish targets.
-$LayoutDir = Join-Path $ProjectDir "bin\Deploy\$Config-$Arch"
-if (-not (Test-Path $LayoutDir)) { throw "Deploy layout not found at $LayoutDir" }
-Write-Host "Layout dir: $LayoutDir"
+# WinAppSDK assembles the layout into bin\Deploy\<Config>-<Arch> when the Deploy
+# target runs. On CI runners where that target doesn't fire, fall back to the
+# standard dotnet publish output and assemble the layout manually.
+$DeployDir  = Join-Path $ProjectDir "bin\Deploy\$Config-$Arch"
+$PublishDir = Join-Path $ProjectDir "bin\$Config\net9.0-windows10.0.19041.0\$Rid\publish"
+
+if (Test-Path $DeployDir) {
+    $LayoutDir = $DeployDir
+    Write-Host "Layout: $LayoutDir (WinAppSDK Deploy)"
+} elseif (Test-Path $PublishDir) {
+    $LayoutDir = $PublishDir
+    Write-Host "Layout: $LayoutDir (manual assembly)"
+
+    # AppxManifest.xml — patch ProcessorArchitecture
+    $content = Get-Content (Join-Path $ProjectDir 'Package.appxmanifest') -Raw
+    $content = $content -replace 'ProcessorArchitecture="[^"]*"', ('ProcessorArchitecture="' + $Arch + '"')
+    Set-Content (Join-Path $LayoutDir 'AppxManifest.xml') -Value $content -Encoding UTF8
+
+    # Assets folder
+    Copy-Item (Join-Path $ProjectDir 'Assets') (Join-Path $LayoutDir 'Assets') -Recurse -Force
+
+    # XBF and resources.pri from the build output (parent of publish/)
+    $BuildOutDir = Join-Path $ProjectDir "bin\$Config\net9.0-windows10.0.19041.0\$Rid"
+    Get-ChildItem $BuildOutDir -Filter '*.xbf' -ErrorAction SilentlyContinue | ForEach-Object {
+        Copy-Item $_.FullName (Join-Path $LayoutDir $_.Name) -Force
+    }
+    $priSrc = Get-ChildItem $BuildOutDir -Filter '*.pri' -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($priSrc) { Copy-Item $priSrc.FullName (Join-Path $LayoutDir 'resources.pri') -Force }
+} else {
+    throw "MSIX layout not found at $DeployDir or $PublishDir — did dotnet publish succeed?"
+}
 
 # ── 2. Locate makeappx ──────────────────────────────────────────────────────────
 $makeappx = Get-ChildItem "$env:USERPROFILE\.nuget\packages\microsoft.windows.sdk.buildtools" `
