@@ -84,6 +84,7 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
             src/zRover.Retriever/bin/Release/zRover.Retriever_${{ steps.ver.outputs.version }}_x64.msix
             src/zRover.Retriever/bin/Release/zRover.Retriever_${{ steps.ver.outputs.version }}_x64.cer
