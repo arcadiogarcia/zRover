@@ -48,15 +48,17 @@ public sealed class ExternalAccessManager : IDisposable
     }
 
     /// <summary>
-    /// Starts the external HTTP listener on <c>0.0.0.0:{port}</c> with a fresh bearer
-    /// token. If already enabled, stops and restarts on the new port.
+    /// Starts the external HTTP listener on <c>0.0.0.0:{port}</c>.
+    /// If <paramref name="existingToken"/> is provided it is reused (e.g. on restore
+    /// across restarts); otherwise a fresh token is generated.
+    /// If already enabled, stops and restarts on the new port.
     /// </summary>
-    public async Task EnableAsync(int port = 5201)
+    public async Task EnableAsync(int port = 5201, string? existingToken = null)
     {
         if (IsEnabled)
             await DisableAsync();
 
-        BearerToken = GenerateToken();
+        BearerToken = existingToken ?? GenerateToken();
         Port = port;
 
         var builder = WebApplication.CreateBuilder();

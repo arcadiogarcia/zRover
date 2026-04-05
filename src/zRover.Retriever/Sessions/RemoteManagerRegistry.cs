@@ -55,6 +55,17 @@ public sealed class RemoteManagerRegistry : IDisposable
     public async Task<string> ConnectAsync(string mcpUrl, string? bearerToken, string? alias = null,
         CancellationToken cancellationToken = default)
     {
+        lock (_lock)
+        {
+            var existing = _managers.Values.FirstOrDefault(m => m.McpUrl == mcpUrl);
+            if (existing is not null)
+            {
+                _logger.LogInformation("Already connected to remote manager at {McpUrl} ({ManagerId}) — skipping duplicate",
+                    mcpUrl, existing.ManagerId);
+                return existing.ManagerId;
+            }
+        }
+
         var managerId = GenerateManagerId();
 
         _logger.LogInformation("Connecting to remote manager at {McpUrl} (alias={Alias}, id={ManagerId})",
