@@ -10,7 +10,7 @@
     Name="zRover.Retriever"
     Publisher="CN=zRover Dev Signing"
     ProcessorArchitecture="x64"
-    Version="0.6.0.0" />
+    Version="0.7.0.0" />
 
   <Properties>
     <DisplayName>zRover Retriever</DisplayName>
