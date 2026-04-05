@@ -4,13 +4,8 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="zRover Retriever">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
     <Grid Padding="24" RowSpacing="16">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
@@ -20,115 +15,112 @@
                    Text="zRover Retriever"
                    Style="{StaticResource TitleTextBlockStyle}"/>
 
-        <!-- Service Info -->
-        <StackPanel Grid.Row="1" Spacing="4">
-            <TextBlock Text="Service" Style="{StaticResource SubtitleTextBlockStyle}"/>
-            <StackPanel Orientation="Horizontal" Spacing="8">
-                <Ellipse x:Name="StatusIndicator" Width="10" Height="10" Fill="Green" VerticalAlignment="Center"/>
-                <TextBlock x:Name="StatusText" Text="Running" VerticalAlignment="Center"/>
-            </StackPanel>
-            <TextBlock x:Name="ListeningUrlText" Text="URL: —" Opacity="0.7"/>
-        </StackPanel>
+        <!-- Two-column body -->
+        <Grid Grid.Row="1" ColumnSpacing="32">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
 
-        <!-- External Access -->
-        <StackPanel Grid.Row="2" Spacing="8">
-            <TextBlock Text="External Access" Style="{StaticResource SubtitleTextBlockStyle}"/>
-            <StackPanel Orientation="Horizontal" Spacing="12">
-                <ToggleSwitch x:Name="ExternalToggle"
-                              Header="Allow external connections"
-                              Toggled="OnExternalToggled"/>
-            </StackPanel>
-            <StackPanel x:Name="ExternalInfoPanel" Visibility="Collapsed" Spacing="4">
-                <TextBlock x:Name="ExternalUrlText" Opacity="0.7" IsTextSelectionEnabled="True"/>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button x:Name="CopyLinkButton" Content="Copy connection link" Click="OnCopyLinkClicked"/>
+            <!-- LEFT: Status column -->
+            <StackPanel Grid.Column="0" Spacing="20">
+
+                <!-- Service Info -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Service" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Ellipse x:Name="StatusIndicator" Width="10" Height="10" Fill="Green" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="StatusText" Text="Running" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock x:Name="ListeningUrlText" Text="URL: —" Opacity="0.7"/>
                 </StackPanel>
-                <TextBlock x:Name="ExternalTokenText" Opacity="0.5" FontSize="11" IsTextSelectionEnabled="True"/>
+
+                <!-- Remote Retrievers -->
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Remote Retrievers" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                    <ListView x:Name="ManagersList" MaxHeight="120">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Padding="4,2" ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Ellipse Grid.Column="0" Width="8" Height="8"
+                                             Fill="{Binding StatusColor}" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding DisplayText}" VerticalAlignment="Center"/>
+                                    <Button Grid.Column="2" Content="Disconnect" Tag="{Binding ManagerId}"
+                                            Click="OnDisconnectManagerClicked" Padding="8,2"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                    <TextBlock x:Name="NoManagersText"
+                               Text="No remote retrievers connected"
+                               Opacity="0.5" FontSize="12"/>
+                </StackPanel>
+
+                <!-- Sessions -->
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Connected Sessions" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                    <ListView x:Name="SessionsList">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Padding="8,6" ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Ellipse Grid.Column="0" Width="10" Height="10"
+                                             Fill="{Binding StatusColor}"
+                                             VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding Details}" Opacity="0.6" FontSize="12"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="2" Text="Active"
+                                               Foreground="Green" FontWeight="SemiBold"
+                                               Visibility="{Binding ActiveVisibility}"
+                                               VerticalAlignment="Center"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                    <TextBlock x:Name="NoSessionsText"
+                               Text="No sessions connected"
+                               Opacity="0.5" FontSize="12"/>
+                </StackPanel>
+
             </StackPanel>
-        </StackPanel>
 
-        <!-- Package Installation -->
-        <StackPanel Grid.Row="3" Spacing="8">
-            <TextBlock Text="Package Installation" Style="{StaticResource SubtitleTextBlockStyle}"/>
-            <ToggleSwitch x:Name="PackageInstallToggle"
-                          Header="Allow MCP clients to install/uninstall packages"
-                          Toggled="OnPackageInstallToggled"/>
-        </StackPanel>
+            <!-- RIGHT: Settings column -->
+            <StackPanel Grid.Column="1" Spacing="20" Width="300">
 
-        <!-- Remote Managers -->
-        <StackPanel Grid.Row="4" Spacing="8">
-            <TextBlock Text="Remote Managers" Style="{StaticResource SubtitleTextBlockStyle}"/>
-            <ListView x:Name="ManagersList" MaxHeight="120">
-                <ListView.ItemTemplate>
-                    <DataTemplate>
-                        <Grid Padding="4,2" ColumnSpacing="12">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <Ellipse Grid.Column="0" Width="8" Height="8"
-                                     Fill="{Binding StatusColor}" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Column="1" Text="{Binding DisplayText}" VerticalAlignment="Center"/>
-                            <Button Grid.Column="2" Content="Disconnect" Tag="{Binding ManagerId}"
-                                    Click="OnDisconnectManagerClicked" Padding="8,2"/>
-                        </Grid>
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
-            <TextBlock x:Name="NoManagersText"
-                       Text="No remote managers connected"
-                       Opacity="0.5" FontSize="12"/>
-        </StackPanel>
+                <!-- External Access -->
+                <StackPanel Spacing="8">
+                    <TextBlock Text="External Access" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                    <ToggleSwitch x:Name="ExternalToggle"
+                                  Header="Allow external connections"
+                                  Toggled="OnExternalToggled"/>
+                    <StackPanel x:Name="ExternalInfoPanel" Visibility="Collapsed" Spacing="4">
+                        <TextBlock x:Name="ExternalUrlText" Opacity="0.7" IsTextSelectionEnabled="True" TextWrapping="Wrap"/>
+                        <Button x:Name="CopyLinkButton" Content="Copy connection link" Click="OnCopyLinkClicked"/>
+                        <TextBlock x:Name="ExternalTokenText" Opacity="0.5" FontSize="11" IsTextSelectionEnabled="True" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </StackPanel>
 
-        <!-- Sessions -->
-        <Grid Grid.Row="5">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
+                <!-- Package Installation -->
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Package Installation" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                    <ToggleSwitch x:Name="PackageInstallToggle"
+                                  Header="Allow MCP clients to install/uninstall packages"
+                                  Toggled="OnPackageInstallToggled"/>
+                </StackPanel>
 
-            <TextBlock Grid.Row="0"
-                       Text="Connected Sessions"
-                       Style="{StaticResource SubtitleTextBlockStyle}"
-                       Margin="0,0,0,8"/>
+            </StackPanel>
 
-            <ListView x:Name="SessionsList" Grid.Row="1">
-                <ListView.ItemTemplate>
-                    <DataTemplate>
-                        <Grid Padding="8,6" ColumnSpacing="12">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-
-                            <Ellipse Grid.Column="0" Width="10" Height="10"
-                                     Fill="{Binding StatusColor}"
-                                     VerticalAlignment="Center"/>
-
-                            <StackPanel Grid.Column="1">
-                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold"/>
-                                <TextBlock Text="{Binding Details}" Opacity="0.6" FontSize="12"/>
-                            </StackPanel>
-
-                            <TextBlock Grid.Column="2" Text="Active"
-                                       Foreground="Green" FontWeight="SemiBold"
-                                       Visibility="{Binding ActiveVisibility}"
-                                       VerticalAlignment="Center"/>
-                        </Grid>
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
-
-            <TextBlock x:Name="NoSessionsText" Grid.Row="1"
-                       Text="No sessions connected"
-                       Opacity="0.5"
-                       HorizontalAlignment="Center"
-                       VerticalAlignment="Center"/>
         </Grid>
-
-
     </Grid>
-    </ScrollViewer>
 </Window>

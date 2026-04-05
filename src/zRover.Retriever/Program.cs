@@ -81,6 +81,7 @@ public class Program
         builder.Services.AddSingleton<McpToolRegistryAdapter>();
         builder.Services.AddSingleton<ActiveSessionProxy>();
         builder.Services.AddSingleton<ExternalAccessManager>();
+        builder.Services.AddSingleton<RetrieverSettingsStore>();
         builder.Services.AddSingleton<RemoteManagerRegistry>();
         builder.Services.AddSingleton<PackageStagingManager>();
         builder.Services.AddSingleton<DevCertManager>();
@@ -108,16 +109,54 @@ public class Program
         var localPkgMgr    = webApp.Services.GetRequiredService<IDevicePackageManager>();
         var remoteMgrs     = webApp.Services.GetRequiredService<RemoteManagerRegistry>();
         var extAccess      = webApp.Services.GetRequiredService<ExternalAccessManager>();
+        var pkgInstall     = webApp.Services.GetRequiredService<PackageInstallManager>();
         var pkgLogger      = webApp.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Packages");
 
         SessionManagementTools.Register(adapter, sessions);
         DevicePackageManagementTools.Register(
             adapter, localPkgMgr, stagingManager, remoteMgrs, extAccess,
-            webApp.Services.GetRequiredService<PackageInstallManager>(),
+            pkgInstall,
             pkgLogger);
 
         var mcpOptions = webApp.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<McpServerOptions>>().Value;
         mcpOptions.ToolCollection = adapter.Tools;
+
+        // ── Restore persisted settings ────────────────────────────────────────────
+        var settingsStore  = webApp.Services.GetRequiredService<RetrieverSettingsStore>();
+        var savedSettings  = settingsStore.Load();
+
+        if (savedSettings.ExternalEnabled)
+        {
+            _ = Task.Run(async () =>
+            {
+                try { await extAccess.EnableAsync(savedSettings.ExternalPort, savedSettings.ExternalBearerToken); }
+                catch { /* logged inside EnableAsync */ }
+            });
+        }
+
+        if (savedSettings.PackageInstallEnabled)
+        {
+            _ = Task.Run(async () =>
+            {
+                try { await pkgInstall.EnableAsync(); }
+                catch { /* logged inside EnableAsync */ }
+            });
+        }
+
+        // Save whenever either manager changes state
+        void SaveCurrentSettings()
+        {
+            settingsStore.Save(new RetrieverSettings
+            {
+                ExternalEnabled      = extAccess.IsEnabled,
+                ExternalPort         = extAccess.IsEnabled ? extAccess.Port : savedSettings.ExternalPort,
+                ExternalBearerToken  = extAccess.BearerToken ?? savedSettings.ExternalBearerToken,
+                PackageInstallEnabled = pkgInstall.IsEnabled,
+            });
+        }
+
+        extAccess.StateChanged   += (_, _) => SaveCurrentSettings();
+        pkgInstall.StateChanged  += (_, _) => SaveCurrentSettings();
 
         // ── Session registration endpoint ─────────────────────────────────────────
         webApp.MapPost("/sessions/register", async (
