@@ -62,7 +62,7 @@ public static class DevicePackageManagementTools
     {
         RegisterListDevices(registry, remoteManagers);
         RegisterListInstalledPackages(registry, localPackageManager, remoteManagers, logger);
-        RegisterInstallPackage(registry, localPackageManager, remoteManagers, packageInstall, logger);
+        RegisterInstallPackage(registry, localPackageManager, stagingManager, remoteManagers, packageInstall, logger);
         RegisterUninstallPackage(registry, localPackageManager, remoteManagers, packageInstall, logger);
         RegisterLaunchApp(registry, localPackageManager, remoteManagers, logger);
         RegisterStopApp(registry, localPackageManager, remoteManagers, logger);
@@ -175,6 +175,7 @@ public static class DevicePackageManagementTools
     private static void RegisterInstallPackage(
         IMcpToolRegistry registry,
         IDevicePackageManager local,
+        PackageStagingManager stagingManager,
         RemoteManagerRegistry remoteManagers,
         PackageInstallManager packageInstall,
         ILogger logger)
@@ -232,9 +233,19 @@ public static class DevicePackageManagementTools
                 // (the downstream stagingId is embedded inside the forwarding entry on this manager)
                 if (IsRemote(deviceId, out var remoteId))
                 {
+                    // Rewrite staged://{localId} to staged://{downstreamId} so the remote
+                    // manager receives the staging ID it actually knows about.
+                    var routedUri = packageUri;
+                    if (packageUri.StartsWith("staged://", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var localStagingId = packageUri["staged://".Length..];
+                        if (stagingManager.Resolve(localStagingId) is ForwardingStagingEntry fwd)
+                            routedUri = $"staged://{fwd.DownstreamStagingId}";
+                    }
+
                     return await remoteManagers.RouteDeviceToolAsync(
                         remoteId!, "install_package",
-                        BuildArgsWithDownstreamStaging(root, packageUri), logger);
+                        BuildArgsWithDownstreamStaging(root, routedUri), logger);
                 }
 
                 if (!packageInstall.IsEnabled)

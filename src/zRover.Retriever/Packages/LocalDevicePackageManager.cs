@@ -266,7 +266,7 @@ public sealed class LocalDevicePackageManager : IDevicePackageManager
         bool preserveAppData,
         CancellationToken ct = default)
     {
-        var pkg = _pm.FindPackageForUser("", packageFamilyName);
+        var pkg = _pm.FindPackagesForUser("", packageFamilyName).FirstOrDefault();
         if (pkg is null)
             return PackageOperationResult.Fail("PACKAGE_NOT_FOUND",
                 $"No installed package found for family name '{packageFamilyName}'.");
@@ -315,7 +315,7 @@ public sealed class LocalDevicePackageManager : IDevicePackageManager
         CancellationToken ct = default)
     {
         // Find the package to enumerate its app entries
-        var pkg = _pm.FindPackageForUser("", packageFamilyName);
+        var pkg = _pm.FindPackagesForUser("", packageFamilyName).FirstOrDefault();
         if (pkg is null)
             return PackageOperationResult.Fail("PACKAGE_NOT_FOUND",
                 $"No installed package found for family name '{packageFamilyName}'.");
@@ -464,7 +464,7 @@ public sealed class LocalDevicePackageManager : IDevicePackageManager
         string packageFamilyName,
         CancellationToken ct = default)
     {
-        var pkg = _pm.FindPackageForUser("", packageFamilyName);
+        var pkg = _pm.FindPackagesForUser("", packageFamilyName).FirstOrDefault();
         if (pkg is null) return null;
 
         var runningFamilies = GetRunningPackageFamilyNames();

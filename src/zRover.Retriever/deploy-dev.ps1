@@ -75,7 +75,7 @@ if (Test-Path $DeployDir) {
     $priSrc = Get-ChildItem $BuildOutDir -Filter '*.pri' -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($priSrc) { Copy-Item $priSrc.FullName (Join-Path $LayoutDir 'resources.pri') -Force }
 } else {
-    throw "MSIX layout not found at $DeployDir or $PublishDir — did dotnet publish succeed?"
+    throw "MSIX layout not found at $DeployDir or $PublishDir - did dotnet publish succeed?"
 }
 
 # ── 2. Locate makeappx ──────────────────────────────────────────────────────────
@@ -89,10 +89,25 @@ if (-not $makeappx) {
 }
 if (-not $makeappx) { throw 'makeappx.exe not found. Install the Windows SDK or restore NuGet packages.' }
 
-# ── 3. Pack MSIX ────────────────────────────────────────────────────────────────
+# ── 3. Patch publisher in layout manifest then pack MSIX ────────────────────────
+$CertSubject = 'CN=zRover Dev Signing'
 $OutDir   = Join-Path $ProjectDir "bin\$Config"
 $MsixName = "zRover.Retriever_${Version}_$Arch.msix"
 $MsixPath = Join-Path $OutDir $MsixName
+
+$LayoutManifest = Join-Path $LayoutDir 'AppxManifest.xml'
+if (Test-Path $LayoutManifest) {
+    $xml = [xml](Get-Content $LayoutManifest -Encoding UTF8)
+    $ns  = New-Object System.Xml.XmlNamespaceManager($xml.NameTable)
+    $ns.AddNamespace('m', 'http://schemas.microsoft.com/appx/manifest/foundation/windows10')
+    $identity = $xml.SelectSingleNode('//m:Identity', $ns)
+    if ($identity -and $identity.Publisher -ne $CertSubject) {
+        Write-Host "Patching manifest Publisher: '$($identity.Publisher)' -> '$CertSubject'"
+        $identity.Publisher = $CertSubject
+        $xml.Save($LayoutManifest)
+    }
+}
+
 Write-Host "Packing MSIX -> $MsixPath"
 & $makeappx pack /d "$LayoutDir" /p "$MsixPath" /o
 if ($LASTEXITCODE -ne 0) { throw 'makeappx pack failed' }
@@ -105,7 +120,6 @@ $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' `
 if (-not $signtool) { throw 'signtool.exe not found. Install the Windows SDK.' }
 
 # ── 5. Ensure signing cert ──────────────────────────────────────────────────────
-$CertSubject = 'CN=zRover Dev Signing'
 $thumb       = $env:SIGNING_CERT_THUMBPRINT  # CI sets this after importing PFX
 
 if (-not $thumb) {

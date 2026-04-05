@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
@@ -10,7 +10,7 @@
     Name="zRover.Retriever"
     Publisher="CN=zRover Dev Signing"
     ProcessorArchitecture="x64"
-    Version="0.5.0.0" />
+    Version="0.6.0.0" />
 
   <Properties>
     <DisplayName>zRover Retriever</DisplayName>
@@ -35,7 +35,7 @@
       EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
         DisplayName="zRover Retriever"
-        Description="zRover Retriever — MCP Server"
+        Description="zRover Retriever â€” MCP Server"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png"
         BackgroundColor="transparent" />
