@@ -91,9 +91,8 @@ jobs:
             The package is signed with a self-signed certificate. Run the following once as **admin** in PowerShell to trust the cert and install:
 
             ```powershell
-            $release = Invoke-RestMethod https://api.github.com/repos/arcadiogarcia/zRover/releases/latest
-            $cerUrl  = ($release.assets | Where-Object { $_.name -like '*.cer'  }).browser_download_url
-            $msixUrl = ($release.assets | Where-Object { $_.name -like '*.msix' }).browser_download_url
+            $cerUrl  = "https://github.com/arcadiogarcia/zRover/releases/download/${{ github.ref_name }}/zRover.Retriever_${{ steps.ver.outputs.version }}_x64.cer"
+            $msixUrl = "https://github.com/arcadiogarcia/zRover/releases/download/${{ github.ref_name }}/zRover.Retriever_${{ steps.ver.outputs.version }}_x64.msix"
 
             # 1. Trust the signing certificate (one-time, requires admin)
             $cer = "$env:TEMP\zRover.cer"
