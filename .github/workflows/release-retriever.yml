@@ -85,6 +85,30 @@ jobs:
           prerelease: false
           generate_release_notes: true
           fail_on_unmatched_files: true
+          body: |
+            ## Installation
+
+            The package is signed with a self-signed certificate. Run the following once as **admin** in PowerShell to trust the cert and install:
+
+            ```powershell
+            $release = Invoke-RestMethod https://api.github.com/repos/arcadiogarcia/zRover/releases/latest
+            $cerUrl  = ($release.assets | Where-Object { $_.name -like '*.cer'  }).browser_download_url
+            $msixUrl = ($release.assets | Where-Object { $_.name -like '*.msix' }).browser_download_url
+
+            # 1. Trust the signing certificate (one-time, requires admin)
+            $cer = "$env:TEMP\zRover.cer"
+            Invoke-WebRequest $cerUrl -OutFile $cer
+            Import-Certificate -FilePath $cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
+            Remove-Item $cer
+
+            # 2. Install (or update) the MSIX
+            $msix = "$env:TEMP\zRover.Retriever.msix"
+            Invoke-WebRequest $msixUrl -OutFile $msix
+            Add-AppxPackage $msix
+            Remove-Item $msix
+            ```
+
+            > **Updating:** Run only step 2 for subsequent releases — the certificate only needs to be trusted once per machine.
           files: |
             src/zRover.Retriever/bin/Release/zRover.Retriever_${{ steps.ver.outputs.version }}_x64.msix
             src/zRover.Retriever/bin/Release/zRover.Retriever_${{ steps.ver.outputs.version }}_x64.cer
