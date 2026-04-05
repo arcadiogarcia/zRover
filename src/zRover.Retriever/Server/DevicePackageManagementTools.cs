@@ -183,9 +183,11 @@ public static class DevicePackageManagementTools
         registry.RegisterTool(
             "install_package",
             "Installs or updates an MSIX package on a device. " +
-            "Supported packageUri formats: https:// URL, file:// local path, " +
+            "Supported packageUri formats: https:// URL, file:// local path (e.g. file:///C:/path/to/app.msix — never a bare Windows path), " +
             "ms-appinstaller:// URI for .appinstaller manifests, or " +
-            "staged://{stagingId} from a prior request_package_upload call.",
+            "staged://{stagingId} from a prior request_package_upload call. " +
+            "For local files, use file:// not a raw path. " +
+            "For staged uploads, ensure request_package_upload was called with the same deviceId as this call.",
             $$"""
             {
               "type": "object",
@@ -194,7 +196,7 @@ public static class DevicePackageManagementTools
                 {{DeviceIdProp}},
                 "packageUri": {
                   "type": "string",
-                  "description": "https://, file://, ms-appinstaller://, or staged://{stagingId}."
+                  "description": "URI of the package. Supported schemes: https://, file:///C:/path/app.msix (NOT a bare Windows path), ms-appinstaller://, or staged://{stagingId}. The staged:// ID must come from a request_package_upload call made with the same deviceId."
                 },
                 "dependencyUris": {
                   "type": "array",
@@ -343,17 +345,21 @@ public static class DevicePackageManagementTools
         registry.RegisterTool(
             "launch_app",
             "Launches a packaged app by its MSIX package family name. " +
-            "Returns the process ID of the launched instance.",
+            "Returns the process ID of the launched instance. " +
+            "Pass packageFamilyName and appId as two separate parameters — do NOT combine them into an AUMID string like 'FamilyName!AppId'.",
             $$"""
             {
               "type": "object",
               "required": ["packageFamilyName"],
               "properties": {
                 {{DeviceIdProp}},
-                "packageFamilyName": { "type": "string" },
+                "packageFamilyName": {
+                  "type": "string",
+                  "description": "Package family name only, e.g. 'ContosoApp_8wekyb3d8bbwe'. Do NOT append '!AppId' — that goes in the separate appId field."
+                },
                 "appId": {
                   "type": "string",
-                  "description": "App entry ID within the package (e.g. 'App'). Omit to use the first/default entry."
+                  "description": "App entry ID within the package (e.g. 'App'). This is the part after '!' in an AUMID. Omit to use the first/default entry."
                 },
                 "arguments": {
                   "type": "string",
@@ -491,7 +497,8 @@ public static class DevicePackageManagementTools
         registry.RegisterTool(
             "request_package_upload",
             "Requests a pre-signed, single-use upload URL for staging an MSIX package on a device. " +
-            "POST the raw package bytes to the returned uploadUrl with Content-Type: application/octet-stream. " +
+            "CRITICAL: pass the same deviceId here as you will pass to install_package — the stagingId is scoped to that device and will return STAGING_NOT_FOUND if used against a different one. " +
+            "POST (not PUT) the raw package bytes to the returned uploadUrl with Content-Type: application/octet-stream. " +
             "The server verifies the SHA-256 at every hop. On success, pass the stagingId to install_package " +
             "as 'staged://{stagingId}'. The upload token expires in 30 minutes; staged files are auto-purged after 24 hours.",
             $$"""
@@ -583,6 +590,8 @@ public static class DevicePackageManagementTools
                         uploadPath      = ticket.UploadPath,
                         localUploadUrl,
                         uploadUrl       = externalUploadUrl ?? localUploadUrl,
+                        uploadMethod    = "POST",
+                        uploadContentType = "application/octet-stream",
                         expiresAt       = ticket.ExpiresAt,
                         maxSizeBytes    = PackageStagingManager.MaxFileSizeBytes,
                         hops            = ticket.Hops,
