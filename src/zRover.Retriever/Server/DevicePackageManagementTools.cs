@@ -61,6 +61,7 @@ public static class DevicePackageManagementTools
         ILogger logger)
     {
         RegisterListDevices(registry, remoteManagers);
+        RegisterGetDeviceInfo(registry, remoteManagers, logger);
         RegisterListInstalledPackages(registry, localPackageManager, remoteManagers, logger);
         RegisterInstallPackage(registry, localPackageManager, stagingManager, remoteManagers, packageInstall, logger);
         RegisterUninstallPackage(registry, localPackageManager, remoteManagers, packageInstall, logger);
@@ -84,31 +85,92 @@ public static class DevicePackageManagementTools
             "list_devices",
             "Lists all devices available for remote MSIX package management. " +
             "Returns the local machine (deviceId: 'local') plus any managers connected via federation. " +
+            "Each entry includes an 'architecture' field (e.g. 'x64', 'arm64') — use this to choose " +
+            "the correct MSIX architecture when calling request_package_upload. " +
             "Use the returned deviceId values in install_package, list_installed_packages, etc.",
             """{"type":"object","properties":{}}""",
             _ =>
             {
+                var localArch = GetLocalArchitecture();
                 var devices = new List<object>
                 {
                     new { deviceId = "local", displayName = "This device", alias = (string?)null,
-                          isConnected = true, hops = 0 }
+                          isConnected = true, hops = 0, architecture = localArch }
                 };
 
                 foreach (var mgr in remoteManagers.Managers)
                 {
                     devices.Add(new
                     {
-                        deviceId    = mgr.ManagerId,
-                        displayName = $"{mgr.Alias} ({mgr.ManagerId})",
-                        alias       = mgr.Alias,
-                        isConnected = mgr.IsConnected,
-                        hops        = 1,
+                        deviceId     = mgr.ManagerId,
+                        displayName  = $"{mgr.Alias} ({mgr.ManagerId})",
+                        alias        = mgr.Alias,
+                        isConnected  = mgr.IsConnected,
+                        hops         = 1,
+                        architecture = mgr.Architecture ?? "unknown",
                     });
                 }
 
                 return Task.FromResult(JsonSerializer.Serialize(new { devices }, JsonOpts));
             });
     }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  get_device_info
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private static void RegisterGetDeviceInfo(
+        IMcpToolRegistry registry,
+        RemoteManagerRegistry remoteManagers,
+        ILogger logger)
+    {
+        registry.RegisterTool(
+            "get_device_info",
+            "Returns hardware and OS information for a device, including its processor architecture. " +
+            "Use 'architecture' to select the correct MSIX before calling request_package_upload: " +
+            "upload an arm64 package for 'arm64' devices and an x64 package for 'x64' devices.",
+            $$"""
+            {
+              "type": "object",
+              "properties": {
+                {{DeviceIdProp}}
+              }
+            }
+            """,
+            async argsJson =>
+            {
+                using var doc = JsonDocument.Parse(argsJson);
+                var root     = doc.RootElement;
+                var deviceId = GetString(root, "deviceId");
+
+                if (IsRemote(deviceId, out var remoteId))
+                    return await remoteManagers.RouteDeviceToolAsync(
+                        remoteId!, "get_device_info",
+                        BuildArgs(root, excludeDeviceId: true), logger);
+
+                var arch = GetLocalArchitecture();
+                var os   = System.Runtime.InteropServices.RuntimeInformation.OSDescription;
+                return JsonSerializer.Serialize(new
+                {
+                    success      = true,
+                    architecture = arch,
+                    osDescription = os,
+                    processorCount = Environment.ProcessorCount,
+                    machineName  = Environment.MachineName,
+                }, JsonOpts);
+            });
+    }
+
+    /// <summary>Returns the OS architecture as a lowercase dotnet RID component, e.g. "x64" or "arm64".</summary>
+    private static string GetLocalArchitecture() =>
+        System.Runtime.InteropServices.RuntimeInformation.OSArchitecture switch
+        {
+            System.Runtime.InteropServices.Architecture.X64   => "x64",
+            System.Runtime.InteropServices.Architecture.Arm64 => "arm64",
+            System.Runtime.InteropServices.Architecture.X86   => "x86",
+            System.Runtime.InteropServices.Architecture.Arm   => "arm",
+            var other                                          => other.ToString().ToLowerInvariant(),
+        };
 
     // ══════════════════════════════════════════════════════════════════════════
     //  list_installed_packages

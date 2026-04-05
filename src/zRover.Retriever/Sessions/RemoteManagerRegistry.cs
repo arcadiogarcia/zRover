@@ -143,6 +143,28 @@ public sealed class RemoteManagerRegistry : IDisposable
         // Discover remote sessions
         await SyncRemoteSessionsAsync(connection, cancellationToken);
 
+        // Fetch remote architecture via get_device_info (best-effort; don't fail connect on error)
+        try
+        {
+            var infoResult = await connection.Client.CallToolAsync("get_device_info",
+                cancellationToken: cancellationToken);
+            var infoJson = infoResult.Content.OfType<ModelContextProtocol.Protocol.TextContentBlock>()
+                .FirstOrDefault()?.Text;
+            if (infoJson is not null)
+            {
+                using var infoDoc = JsonDocument.Parse(infoJson);
+                if (infoDoc.RootElement.TryGetProperty("architecture", out var archEl) &&
+                    archEl.ValueKind == JsonValueKind.String)
+                {
+                    connection.Info = connection.Info with { Architecture = archEl.GetString() };
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not fetch device info from remote manager {ManagerId} — architecture will be unknown", managerId);
+        }
+
         // Start disconnect monitoring
         _ = client.Completion.ContinueWith(_ => OnManagerDisconnected(managerId), TaskScheduler.Default);
 
@@ -537,4 +559,6 @@ public record RemoteManagerInfo
     public string McpUrl { get; init; } = "";
     public bool IsConnected { get; init; }
     public int AppCount { get; init; }
+    /// <summary>OS processor architecture reported by the remote device, e.g. "x64" or "arm64". Null if not yet determined.</summary>
+    public string? Architecture { get; init; }
 }
