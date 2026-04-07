@@ -41,44 +41,64 @@ if (-not $SkipInstall) {
     }
 }
 
-# ── 1. Publish binary layout ──────────────────────────────────────────────────
+# ── 1. Clean previous build output ─────────────────────────────────────────
+# Only clean final artifacts (.msix/.cer/.appinstaller). The bin\Deploy layout
+# folder is an MSBuild/WinAppSDK intermediate — leave it so the WinAppSDK path
+# is used when available; dotnet publish alone does not regenerate it.
+Write-Host "Cleaning previous build output..."
+Get-ChildItem (Join-Path $ProjectDir "bin\$Config") -Filter "zRover.Retriever_*_$Arch.*" -ErrorAction SilentlyContinue |
+    ForEach-Object { Remove-Item $_.FullName -Force; Write-Host "  Removed $($_.Name)" }
+$oldAppInstaller = Join-Path $ProjectDir "bin\$Config\zRover.Retriever.appinstaller"
+if (Test-Path $oldAppInstaller) { Remove-Item $oldAppInstaller -Force; Write-Host "  Removed zRover.Retriever.appinstaller" }
+
+# ── 2. Publish binary layout ──────────────────────────────────────────────────
 Write-Host "Publishing ($Config|$Arch)..."
 dotnet publish $ProjectFile -c $Config -r $Rid --no-self-contained
 if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed' }
 
 # WinAppSDK assembles the layout into bin\Deploy\<Config>-<Arch> when the Deploy
-# target runs. On CI runners where that target doesn't fire, fall back to the
-# standard dotnet publish output and assemble the layout manually.
-$DeployDir  = Join-Path $ProjectDir "bin\Deploy\$Config-$Arch"
-$PublishDir = Join-Path $ProjectDir "bin\$Config\net9.0-windows10.0.19041.0\$Rid\publish"
+# target runs (VS build). When running dotnet publish alone (CI / command line)
+# that target doesn't fire, so we fall back to the regular build output dir
+# (bin\<Config>\net9.0-...\<rid>) which already contains Assets\, XBF files,
+# and <ProjectName>.pri — we just need to add AppxManifest.xml and rename the
+# PRI to resources.pri. Do NOT use the publish\ subdirectory: it has a broken
+# PRI that lacks the scale-variant mappings the splash screen resolver needs.
+$DeployDir   = Join-Path $ProjectDir "bin\Deploy\$Config-$Arch"
+$BuildOutDir = Join-Path $ProjectDir "bin\$Config\net9.0-windows10.0.19041.0\$Rid"
 
 if (Test-Path $DeployDir) {
     $LayoutDir = $DeployDir
     Write-Host "Layout: $LayoutDir (WinAppSDK Deploy)"
-} elseif (Test-Path $PublishDir) {
-    $LayoutDir = $PublishDir
-    Write-Host "Layout: $LayoutDir (manual assembly)"
+} elseif (Test-Path $BuildOutDir) {
+    $LayoutDir = $BuildOutDir
+    Write-Host "Layout: $LayoutDir (manual assembly from build output)"
 
-    # AppxManifest.xml — patch ProcessorArchitecture
+    # AppxManifest.xml — patch ProcessorArchitecture to match the target RID
     $content = Get-Content (Join-Path $ProjectDir 'Package.appxmanifest') -Raw
     $content = $content -replace 'ProcessorArchitecture="[^"]*"', ('ProcessorArchitecture="' + $Arch + '"')
     Set-Content (Join-Path $LayoutDir 'AppxManifest.xml') -Value $content -Encoding UTF8
 
-    # Assets folder
-    Copy-Item (Join-Path $ProjectDir 'Assets') (Join-Path $LayoutDir 'Assets') -Recurse -Force
-
-    # XBF and resources.pri from the build output (parent of publish/)
-    $BuildOutDir = Join-Path $ProjectDir "bin\$Config\net9.0-windows10.0.19041.0\$Rid"
-    Get-ChildItem $BuildOutDir -Filter '*.xbf' -ErrorAction SilentlyContinue | ForEach-Object {
-        Copy-Item $_.FullName (Join-Path $LayoutDir $_.Name) -Force
+    # Rename <ProjectName>.pri -> resources.pri (makeappx expects this name)
+    $priSrc = Get-ChildItem $BuildOutDir -Filter '*.pri' -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -ne 'resources.pri' } | Select-Object -First 1
+    if ($priSrc) {
+        Copy-Item $priSrc.FullName (Join-Path $LayoutDir 'resources.pri') -Force
+    } elseif (-not (Test-Path (Join-Path $LayoutDir 'resources.pri'))) {
+        throw "No .pri file found in $BuildOutDir - did the build succeed?"
     }
-    $priSrc = Get-ChildItem $BuildOutDir -Filter '*.pri' -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($priSrc) { Copy-Item $priSrc.FullName (Join-Path $LayoutDir 'resources.pri') -Force }
+
+    # Remove the publish\ subdirectory dotnet publish creates inside the build
+    # output dir — it duplicates all DLLs and would be packed as publish\*.dll
+    $publishSubdir = Join-Path $BuildOutDir 'publish'
+    if (Test-Path $publishSubdir) {
+        Remove-Item $publishSubdir -Recurse -Force
+        Write-Host "  Removed publish\ subdirectory from layout"
+    }
 } else {
-    throw "MSIX layout not found at $DeployDir or $PublishDir - did dotnet publish succeed?"
+    throw "MSIX layout not found at $DeployDir or $BuildOutDir - did the build succeed?"
 }
 
-# ── 2. Locate makeappx ──────────────────────────────────────────────────────────
+# ── 3. Locate makeappx ──────────────────────────────────────────────────────────
 $makeappx = Get-ChildItem "$env:USERPROFILE\.nuget\packages\microsoft.windows.sdk.buildtools" `
     -Recurse -Filter 'makeappx.exe' -ErrorAction SilentlyContinue |
     Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
@@ -89,7 +109,7 @@ if (-not $makeappx) {
 }
 if (-not $makeappx) { throw 'makeappx.exe not found. Install the Windows SDK or restore NuGet packages.' }
 
-# ── 3. Patch publisher in layout manifest then pack MSIX ────────────────────────
+# ── 4. Patch publisher in layout manifest then pack MSIX ────────────────────────
 $CertSubject = 'CN=zRover Dev Signing'
 $OutDir   = Join-Path $ProjectDir "bin\$Config"
 $MsixName = "zRover.Retriever_${Version}_$Arch.msix"
@@ -113,13 +133,18 @@ Write-Host "Packing MSIX -> $MsixPath"
 if ($LASTEXITCODE -ne 0) { throw 'makeappx pack failed' }
 Write-Host "Packed OK"
 
-# ── 4. Locate signtool ──────────────────────────────────────────────────────────
-$signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' `
+# ── 5. Locate signtool ──────────────────────────────────────────────────────────
+$signtool = Get-ChildItem "$env:USERPROFILE\.nuget\packages\microsoft.windows.sdk.buildtools" `
     -Recurse -Filter 'signtool.exe' -ErrorAction SilentlyContinue |
     Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
-if (-not $signtool) { throw 'signtool.exe not found. Install the Windows SDK.' }
+if (-not $signtool) {
+    $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' `
+        -Recurse -Filter 'signtool.exe' -ErrorAction SilentlyContinue |
+        Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+}
+if (-not $signtool) { throw 'signtool.exe not found. Install the Windows SDK or restore NuGet packages.' }
 
-# ── 5. Ensure signing cert ──────────────────────────────────────────────────────
+# ── 6. Ensure signing cert ──────────────────────────────────────────────────────
 $thumb       = $env:SIGNING_CERT_THUMBPRINT  # CI sets this after importing PFX
 
 if (-not $thumb) {
@@ -155,20 +180,20 @@ if (-not $thumb) {
     }
 }
 
-# ── 6. Sign the MSIX ────────────────────────────────────────────────────────────
+# ── 7. Sign the MSIX ────────────────────────────────────────────────────────────
 Write-Host "Signing $MsixPath ..."
 & $signtool sign /fd SHA256 /sha1 $thumb "$MsixPath"
 if ($LASTEXITCODE -ne 0) { throw 'signtool sign failed' }
 Write-Host 'Signed OK'
 
-# ── 7. Export public .cer alongside the .msix ───────────────────────────────────
+# ── 8. Export public .cer alongside the .msix ───────────────────────────────────
 $CerPath  = [System.IO.Path]::ChangeExtension($MsixPath, '.cer')
 $certObj  = Get-ChildItem Cert:\CurrentUser\My | Where-Object { $_.Thumbprint -eq $thumb }
 $certBytes = $certObj.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert)
 [System.IO.File]::WriteAllBytes($CerPath, $certBytes)
 Write-Host "Exported cert -> $CerPath"
 
-# ── 8. Generate .appinstaller ─────────────────────────────────────────────────
+# ── 9. Generate .appinstaller ─────────────────────────────────────────────────
 $Tag             = "v$Version"
 $BaseUrl         = "https://github.com/arcadiogarcia/zRover/releases"
 $AppInstallerUrl = "$BaseUrl/latest/download/zRover.Retriever.appinstaller"
@@ -223,143 +248,6 @@ if ($existing) {
 }
 
 # ── 12. Install ───────────────────────────────────────────────────────────────
-Write-Host "Installing $MsixPath ..."
-Add-AppxPackage $MsixPath
-
-Write-Host ''
-Write-Host 'Done. Package installed:'
-Get-AppxPackage | Where-Object { $_.Name -eq 'zRover.Retriever' } |
-    Select-Object Name, Version, PackageFullName | Format-List
-
-Write-Host 'Startup task will appear in Task Manager > Startup apps after next login.'
-
-
-$ErrorActionPreference = 'Stop'
-$ProjectDir  = $PSScriptRoot
-$ProjectFile = Join-Path $ProjectDir 'zRover.Retriever.csproj'
-$Rid         = "win-$Arch"
-
-# ── 0. Stop any running instance so DLLs are not locked ───────────────────────
-$running = Get-Process -Name 'zRover.Retriever' -ErrorAction SilentlyContinue
-if ($running) {
-    Write-Host "Stopping zRover.Retriever (PID $($running.Id -join ', '))..."
-    $running | Stop-Process -Force
-    $running | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
-}
-
-# ── 1. Publish binary layout ──────────────────────────────────────────────────
-Write-Host "Publishing ($Config|$Arch)..."
-$LayoutDir = Join-Path $ProjectDir "bin\$Config\net9.0-windows10.0.19041.0\$Rid\publish"
-dotnet publish $ProjectFile -c $Config -r $Rid --no-self-contained
-if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed' }
-
-# ── 2. Assemble MSIX layout (AppxManifest, XBF, resources.pri, Assets) ────────
-
-# AppxManifest.xml (patch ProcessorArchitecture to match the target RID)
-$ManifestDst = Join-Path $LayoutDir 'AppxManifest.xml'
-$content = Get-Content (Join-Path $ProjectDir 'Package.appxmanifest') -Raw
-$content = $content -replace 'ProcessorArchitecture="[^"]*"', ('ProcessorArchitecture="' + $Arch + '"')
-Set-Content $ManifestDst -Value $content -Encoding UTF8
-
-# Assets folder
-Copy-Item (Join-Path $ProjectDir 'Assets') (Join-Path $LayoutDir 'Assets') -Recurse -Force
-
-# XBF and resources.pri from the build output (next to the binary)
-$BuildOutDir = Join-Path $ProjectDir "bin\$Config\net9.0-windows10.0.19041.0\$Rid"
-Get-ChildItem $BuildOutDir -Filter '*.xbf' -ErrorAction SilentlyContinue | ForEach-Object {
-    Copy-Item $_.FullName (Join-Path $LayoutDir $_.Name) -Force
-}
-$priSrc = Get-ChildItem $BuildOutDir -Filter '*.pri' -ErrorAction SilentlyContinue | Select-Object -First 1
-if ($priSrc) { Copy-Item $priSrc.FullName (Join-Path $LayoutDir 'resources.pri') -Force }
-
-# ── 3. Pack MSIX with makeappx ────────────────────────────────────────────────
-$makeappx = Get-ChildItem "$env:USERPROFILE\.nuget\packages\microsoft.windows.sdk.buildtools" `
-    -Recurse -Filter 'makeappx.exe' -ErrorAction SilentlyContinue |
-    Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
-if (-not $makeappx) {
-    # Fall back to Windows SDK installation
-    $makeappx = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' `
-        -Recurse -Filter 'makeappx.exe' -ErrorAction SilentlyContinue |
-        Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
-}
-if (-not $makeappx) { throw 'makeappx.exe not found. Install the Windows SDK or restore NuGet packages.' }
-
-$OutDir  = Join-Path $ProjectDir "bin\$Config"
-$MsixPath = Join-Path $OutDir "zRover.Retriever_1.0.0.0_$Arch.msix"
-Write-Host "Packing MSIX -> $MsixPath"
-& $makeappx pack /d "$LayoutDir" /p "$MsixPath" /o
-if ($LASTEXITCODE -ne 0) { throw 'makeappx pack failed' }
-Write-Host "Packed OK"
-
-# ── 3. Locate signtool from Windows SDK ───────────────────────────────────────
-$SdkBin = 'C:\Program Files (x86)\Windows Kits\10\bin'
-$signtool = Get-ChildItem $SdkBin -Recurse -Filter 'signtool.exe' -ErrorAction SilentlyContinue |
-    Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
-if (-not $signtool) { throw 'signtool.exe not found. Install the Windows SDK.' }
-
-# ── 4. Ensure dev signing cert (CN=zRover Dev Signing) ────────────────────────
-$CertSubject = 'CN=zRover Dev Signing'
-$StateFile   = Join-Path $env:LOCALAPPDATA 'zRover.Retriever\dev-cert.json'
-$thumb       = $null
-
-if (Test-Path $StateFile) {
-    try {
-        $state = Get-Content $StateFile -Raw | ConvertFrom-Json
-        $thumb = $state.thumbprint
-        $match = Get-ChildItem Cert:\CurrentUser\My |
-            Where-Object { $_.Thumbprint -eq $thumb -and $_.HasPrivateKey }
-        if (-not $match) { $thumb = $null }
-    } catch { $thumb = $null }
-}
-
-if (-not $thumb) {
-    Write-Host 'Creating dev signing cert...'
-    $cert  = New-SelfSignedCertificate `
-        -Subject $CertSubject `
-        -CertStoreLocation 'Cert:\CurrentUser\My' `
-        -KeyUsage DigitalSignature `
-        -Type CodeSigningCert `
-        -HashAlgorithm SHA256 `
-        -NotAfter (Get-Date).AddYears(10)
-    $thumb = $cert.Thumbprint
-    $stateDir = Split-Path $StateFile
-    if (-not (Test-Path $stateDir)) { New-Item -ItemType Directory -Path $stateDir | Out-Null }
-    [ordered]@{ thumbprint = $thumb; subject = $CertSubject } |
-        ConvertTo-Json | Set-Content $StateFile -Encoding UTF8
-    Write-Host "Dev cert created (thumb: $thumb)"
-} else {
-    Write-Host "Reusing existing dev cert (thumb: $thumb)"
-}
-
-# ── 5. Sign the MSIX (cert must be in CurrentUser\My; trust not required yet) ──
-Write-Host "Signing $MsixPath ..."
-& $signtool sign /fd SHA256 /sha1 $thumb "$MsixPath"
-if ($LASTEXITCODE -ne 0) { throw 'signtool sign failed' }
-Write-Host 'Signed OK'
-
-# ── 6. Export public .cer alongside the .msix (for distribution) ──────────────
-$certObj   = Get-ChildItem Cert:\CurrentUser\My | Where-Object { $_.Thumbprint -eq $thumb }
-$certBytes = $certObj.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert)
-$CerPath   = [System.IO.Path]::ChangeExtension($MsixPath, '.cer')
-[System.IO.File]::WriteAllBytes($CerPath, $certBytes)
-Write-Host "Exported cert -> $CerPath"
-
-# ── 7. Trust cert in LocalMachine\TrustedPeople (once; UAC prompt) ────────────
-$trusted = Get-ChildItem Cert:\LocalMachine\TrustedPeople -ErrorAction SilentlyContinue |
-    Where-Object { $_.Thumbprint -eq $thumb } | Select-Object -First 1
-if (-not $trusted) {
-    Write-Host 'Trusting dev cert in LocalMachine\TrustedPeople (UAC prompt)...'
-    Start-Process certutil -ArgumentList "-addstore TrustedPeople `"$CerPath`"" -Verb RunAs -Wait
-}
-
-# ── 8. Remove any previously installed version ────────────────────────────────
-$existing = Get-AppxPackage | Where-Object { $_.Name -eq 'zRover.Retriever' }
-if ($existing) {
-    Write-Host "Removing previous: $($existing.PackageFullName)"
-    Remove-AppxPackage $existing.PackageFullName
-}
-
-# ── 9. Install the signed MSIX ────────────────────────────────────────────────
 Write-Host "Installing $MsixPath ..."
 Add-AppxPackage $MsixPath
 

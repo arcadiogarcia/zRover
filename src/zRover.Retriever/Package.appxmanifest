@@ -10,7 +10,7 @@
     Name="zRover.Retriever"
     Publisher="CN=zRover Dev Signing"
     ProcessorArchitecture="x64"
-    Version="0.8.0.0" />
+    Version="0.9.0.0" />
 
   <Properties>
     <DisplayName>zRover Retriever</DisplayName>
@@ -38,7 +38,10 @@
         Description="zRover Retriever â€” MCP Server"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png"
-        BackgroundColor="transparent" />
+        BackgroundColor="transparent" >
+        <uap:DefaultTile Square71x71Logo="Assets\SmallTile.png" Wide310x150Logo="Assets\WideTile.png" Square310x310Logo="Assets\LargeTile.png"/>
+        <uap:SplashScreen Image="Assets\SplashScreen.png"/>
+      </uap:VisualElements>
       <Extensions>
         <!-- StartupTask: auto-launch at user login (user can disable via Task Manager) -->
         <desktop:Extension
