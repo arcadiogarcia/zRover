@@ -1,11 +1,8 @@
 using System.Diagnostics;
-using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
-using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
-using Microsoft.Win32;
 
 namespace zRover.Retriever.Packages;
 
@@ -16,7 +13,8 @@ namespace zRover.Retriever.Packages;
 /// A single cert with subject <c>CN=zRover Dev Signing</c> is created on first use
 /// and reused for all subsequent packages, regardless of their declared publisher.
 /// When the package publisher does not match the cert subject, the package is
-/// repacked via <c>makeappx.exe</c> with the publisher patched to match before signing.
+/// repacked with the publisher patched (via <see cref="MsixPacker"/>) before being
+/// signed (via <see cref="MsixSigner"/>). No external SDK tools are required.
 ///
 /// This means only one UAC prompt is ever needed (to trust the cert in
 /// <c>LocalMachine\TrustedPeople</c>) — subsequent package installs are fully
@@ -35,8 +33,6 @@ public sealed class DevCertManager : IDevCertManager
 
     private readonly ILogger<DevCertManager> _logger;
     private X509Certificate2? _cert;
-    private string? _signtool;
-    private string? _makeappx;
 
     public DevCertManager(ILogger<DevCertManager> logger)
     {
@@ -44,23 +40,16 @@ public sealed class DevCertManager : IDevCertManager
     }
 
     /// <summary>True once <see cref="EnsureReadyAsync"/> has completed successfully.</summary>
-    public bool IsReady => _cert is not null && _signtool is not null;
+    public bool IsReady => _cert is not null;
 
     /// <summary>
-    /// Creates (or loads) the machine dev cert, trusts it, and locates signtool/makeappx.
-    /// Safe to call multiple times.
+    /// Creates (or loads) the machine dev cert and trusts it in
+    /// <c>LocalMachine\TrustedPeople</c> (one-time UAC prompt).
+    /// Safe to call multiple times — subsequent calls return immediately if already ready.
     /// </summary>
     public async Task EnsureReadyAsync(CancellationToken ct = default)
     {
         if (IsReady) return;
-
-        _signtool = FindTool("signtool.exe");
-        _makeappx = FindTool("makeappx.exe");
-
-        if (_signtool is null)
-            _logger.LogWarning("signtool.exe not found — package signing will be unavailable");
-        if (_makeappx is null)
-            _logger.LogWarning("makeappx.exe not found — publisher patching will be unavailable");
 
         _cert = LoadPersistedCert() ?? CreateAndPersistCert();
         await EnsureTrustedAsync(ct);
@@ -70,97 +59,26 @@ public sealed class DevCertManager : IDevCertManager
 
     /// <summary>
     /// Ensures the MSIX at <paramref name="msixPath"/> has publisher
-    /// <see cref="CertSubject"/> (repacking via makeappx if needed),
-    /// then signs it with the dev cert.
+    /// <see cref="CertSubject"/> (repacking via <see cref="MsixPacker"/> if needed),
+    /// then signs it with the dev cert via <see cref="MsixSigner"/>.
     /// </summary>
     public async Task SignPackageAsync(string msixPath, CancellationToken ct = default)
     {
-        if (_cert is null || _signtool is null)
+        if (_cert is null)
             throw new InvalidOperationException("DevCertManager is not ready. Call EnsureReadyAsync first.");
 
-        var publisher = ReadPublisherFromMsix(msixPath);
+        var publisher = MsixPacker.ReadPublisher(msixPath);
 
         if (!string.Equals(publisher, CertSubject, StringComparison.OrdinalIgnoreCase))
         {
-            if (_makeappx is null)
-                throw new InvalidOperationException(
-                    $"Package publisher '{publisher}' does not match the dev cert subject '{CertSubject}', " +
-                    "and makeappx.exe was not found to repack it. " +
-                    "Install the Windows SDK (https://developer.microsoft.com/windows/downloads/windows-sdk/).");
-
             _logger.LogInformation("Patching publisher '{Old}' \u2192 '{New}' in {Path}",
                 publisher, CertSubject, msixPath);
-            await RepackWithPatchedPublisherAsync(msixPath, ct);
+            await MsixPacker.RepackWithPatchedPublisherAsync(msixPath, CertSubject, ct);
         }
 
         _logger.LogInformation("Signing {Path} (thumb: {Thumb})", msixPath, _cert.Thumbprint);
-        await RunAsync(_signtool,
-            $"sign /fd SHA256 /sha1 {_cert.Thumbprint} \"{msixPath}\"", ct);
+        await MsixSigner.SignAsync(msixPath, _cert, ct);
         _logger.LogInformation("Signed OK: {Path}", msixPath);
-    }
-
-    // ── Publisher patching ─────────────────────────────────────────────────────
-
-    private async Task RepackWithPatchedPublisherAsync(string msixPath, CancellationToken ct)
-    {
-        var tempExtract = Path.Combine(Path.GetTempPath(), $"zrover-extract-{Guid.NewGuid():N}");
-        var tempPacked  = Path.Combine(Path.GetTempPath(), $"zrover-repacked-{Guid.NewGuid():N}.msix");
-
-        try
-        {
-            ZipFile.ExtractToDirectory(msixPath, tempExtract);
-
-            var manifestPath = Path.Combine(tempExtract, "AppxManifest.xml");
-            PatchManifestPublisher(manifestPath, CertSubject);
-
-            // Remove old signature — signtool will add a fresh one after repacking
-            var sigPath = Path.Combine(tempExtract, "AppxSignature.p7x");
-            if (File.Exists(sigPath)) File.Delete(sigPath);
-
-            // makeappx recalculates AppxBlockMap.xml automatically
-            await RunAsync(_makeappx!,
-                $"pack /d \"{tempExtract}\" /p \"{tempPacked}\" /o", ct);
-
-            File.Move(tempPacked, msixPath, overwrite: true);
-        }
-        finally
-        {
-            if (Directory.Exists(tempExtract))
-                try { Directory.Delete(tempExtract, recursive: true); } catch { }
-            if (File.Exists(tempPacked))
-                try { File.Delete(tempPacked); } catch { }
-        }
-    }
-
-    private static void PatchManifestPublisher(string manifestPath, string newPublisher)
-    {
-        var doc = XDocument.Load(manifestPath);
-        XNamespace ns = "http://schemas.microsoft.com/appx/manifest/foundation/windows10";
-        var attr = doc.Root
-            ?.Element(ns + "Identity")
-            ?.Attribute("Publisher")
-            ?? throw new InvalidOperationException(
-                "Could not find Identity/@Publisher in AppxManifest.xml.");
-        attr.SetValue(newPublisher);
-        doc.Save(manifestPath);
-    }
-
-    // ── MSIX manifest reading ──────────────────────────────────────────────────
-
-    private static string ReadPublisherFromMsix(string msixPath)
-    {
-        using var zip = ZipFile.OpenRead(msixPath);
-        var entry = zip.GetEntry("AppxManifest.xml")
-            ?? throw new InvalidOperationException("AppxManifest.xml not found in package.");
-        using var stream = entry.Open();
-        var doc = XDocument.Load(stream);
-        XNamespace ns = "http://schemas.microsoft.com/appx/manifest/foundation/windows10";
-        return doc.Root
-            ?.Element(ns + "Identity")
-            ?.Attribute("Publisher")
-            ?.Value
-            ?? throw new InvalidOperationException(
-                "Could not read Publisher from AppxManifest.xml.");
     }
 
     // ── Cert lifecycle ─────────────────────────────────────────────────────────
@@ -241,20 +159,31 @@ public sealed class DevCertManager : IDevCertManager
 
     private async Task EnsureTrustedAsync(CancellationToken ct)
     {
-        if (IsCertTrusted(_cert!)) return;
+        var needsTrustedPeople = !IsCertTrusted(_cert!);
+        var needsRoot          = !IsCertInRootStore(_cert!);
+        if (!needsTrustedPeople && !needsRoot) return;
 
-        _logger.LogInformation("Dev cert not yet trusted in LocalMachine\\TrustedPeople — importing");
+        if (needsTrustedPeople)
+            _logger.LogInformation("Dev cert not yet trusted in LocalMachine\\TrustedPeople — importing");
+        if (needsRoot)
+            _logger.LogInformation("Dev cert not yet in LocalMachine\\Root — importing (required for SignerSignEx2)");
 
-        try
+        // Try without elevation first (only works for TrustedPeople on some configurations).
+        if (needsTrustedPeople)
         {
-            using var store = new X509Store(StoreName.TrustedPeople, StoreLocation.LocalMachine);
-            store.Open(OpenFlags.ReadWrite);
-            store.Add(_cert!);
-            _logger.LogInformation("Dev cert trusted in LocalMachine\\TrustedPeople");
-            return;
+            try
+            {
+                using var store = new X509Store(StoreName.TrustedPeople, StoreLocation.LocalMachine);
+                store.Open(OpenFlags.ReadWrite);
+                store.Add(_cert!);
+                _logger.LogInformation("Dev cert trusted in LocalMachine\\TrustedPeople");
+                needsTrustedPeople = false;
+            }
+            catch (UnauthorizedAccessException) { }
+            catch (CryptographicException ex) when ((uint)ex.HResult == 0x80070005) { }
         }
-        catch (UnauthorizedAccessException) { }
-        catch (CryptographicException ex) when ((uint)ex.HResult == 0x80070005) { }
+
+        if (!needsTrustedPeople && !needsRoot) return;
 
         // Export to %TEMP% so the elevated process can always read the file —
         // the packaged app's LocalAppData has restricted ACLs that block other users/processes.
@@ -264,7 +193,9 @@ public sealed class DevCertManager : IDevCertManager
         var escapedPath = cerPath.Replace("'", "''");
         var psi = new ProcessStartInfo("powershell.exe",
             $"-NoProfile -Command \"Import-Certificate -FilePath '{escapedPath}' " +
-            "-CertStoreLocation Cert:\\\\LocalMachine\\\\TrustedPeople | Out-Null\"")
+            "-CertStoreLocation Cert:\\\\LocalMachine\\\\TrustedPeople | Out-Null; " +
+            "Import-Certificate -FilePath '{escapedPath}' " +
+            "-CertStoreLocation Cert:\\\\LocalMachine\\\\Root | Out-Null\"")
         {
             Verb = "runas", UseShellExecute = true, CreateNoWindow = false,
         };
@@ -275,9 +206,9 @@ public sealed class DevCertManager : IDevCertManager
             if (proc is not null)
             {
                 await proc.WaitForExitAsync(ct);
-                if (proc.ExitCode == 0 && IsCertTrusted(_cert!))
+                if (proc.ExitCode == 0 && IsCertTrusted(_cert!) && IsCertInRootStore(_cert!))
                 {
-                    _logger.LogInformation("Dev cert trusted via UAC elevation");
+                    _logger.LogInformation("Dev cert trusted via UAC elevation (TrustedPeople + Root)");
                     return;
                 }
             }
@@ -305,73 +236,17 @@ public sealed class DevCertManager : IDevCertManager
         catch { return false; }
     }
 
-    // ── Process helpers ────────────────────────────────────────────────────────
-
-    private static async Task RunAsync(string exe, string args, CancellationToken ct)
+    private static bool IsCertInRootStore(X509Certificate2 cert)
     {
-        var psi = new ProcessStartInfo(exe, args)
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError  = true,
-            UseShellExecute        = false,
-            CreateNoWindow         = true,
-        };
-
-        using var proc = Process.Start(psi)
-            ?? throw new InvalidOperationException($"Failed to start {exe}");
-
-        var stdout = proc.StandardOutput.ReadToEndAsync(ct);
-        var stderr = proc.StandardError.ReadToEndAsync(ct);
-        await proc.WaitForExitAsync(ct);
-
-        if (proc.ExitCode != 0)
-            throw new InvalidOperationException(
-                $"{Path.GetFileName(exe)} exited {proc.ExitCode}. " +
-                $"stdout: {await stdout} stderr: {await stderr}");
-    }
-
-    // ── Tool discovery ─────────────────────────────────────────────────────────
-
-    private string? FindTool(string exeName)
-    {
-        var pathVar = Environment.GetEnvironmentVariable("PATH") ?? "";
-        foreach (var dir in pathVar.Split(Path.PathSeparator))
-        {
-            var full = Path.Combine(dir.Trim(), exeName);
-            if (File.Exists(full)) return full;
-        }
-
-        string? kitsRoot = null;
         try
         {
-            using var key = Registry.LocalMachine.OpenSubKey(
-                @"SOFTWARE\Microsoft\Windows Kits\Installed Roots");
-            kitsRoot = key?.GetValue("KitsRoot10") as string;
+            using var store = new X509Store(StoreName.Root, StoreLocation.LocalMachine);
+            store.Open(OpenFlags.ReadOnly);
+            return store.Certificates
+                .Find(X509FindType.FindByThumbprint, cert.Thumbprint, validOnly: false)
+                .Count > 0;
         }
-        catch { }
-
-        if (kitsRoot is not null)
-        {
-            var binDir = Path.Combine(kitsRoot, "bin");
-            var archs  = Environment.Is64BitOperatingSystem
-                ? new[] { "x64", "arm64", "x86" }
-                : new[] { "x86" };
-
-            foreach (var ver in Directory.GetDirectories(binDir, "10.*")
-                         .OrderByDescending(d => d))
-                foreach (var arch in archs)
-                {
-                    var path = Path.Combine(ver, arch, exeName);
-                    if (File.Exists(path)) return path;
-                }
-
-            foreach (var arch in archs)
-            {
-                var path = Path.Combine(binDir, arch, exeName);
-                if (File.Exists(path)) return path;
-            }
-        }
-
-        return null;
+        catch { return false; }
     }
+
 }

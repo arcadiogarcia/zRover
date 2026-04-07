@@ -23,6 +23,7 @@
     <PackageReference Include="ModelContextProtocol" Version="1.1.0" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" Version="1.1.0" />
     <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="9.0.0" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="*" />
     <PackageReference Include="xunit" Version="2.5.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
   </ItemGroup>
@@ -30,14 +31,12 @@
   <!-- Compile the staging manager source directly — avoids pulling in the WinUI
        Retriever project which requires the Windows App SDK bootstrap. -->
   <ItemGroup>
-    <Compile Include="..\zRover.Retriever\Packages\PackageStagingManager.cs"
-             LinkBase="Packages" />
-    <Compile Include="..\zRover.Retriever\Packages\IDevCertManager.cs"
-             LinkBase="Packages" />
-    <Compile Include="..\zRover.Retriever\Packages\PackageInstallManager.cs"
-             LinkBase="Packages" />
-    <Compile Include="..\zRover.Retriever\Server\PackageStagingEndpoint.cs"
-             LinkBase="Server" />
+    <Compile Include="..\zRover.Retriever\Packages\PackageStagingManager.cs" LinkBase="Packages" />
+    <Compile Include="..\zRover.Retriever\Packages\IDevCertManager.cs" LinkBase="Packages" />
+    <Compile Include="..\zRover.Retriever\Packages\PackageInstallManager.cs" LinkBase="Packages" />
+    <Compile Include="..\zRover.Retriever\Packages\MsixPacker.cs" LinkBase="Packages" />
+    <Compile Include="..\zRover.Retriever\Packages\MsixSigner.cs" LinkBase="Packages" />
+    <Compile Include="..\zRover.Retriever\Server\PackageStagingEndpoint.cs" LinkBase="Server" />
   </ItemGroup>
 
   <ItemGroup>

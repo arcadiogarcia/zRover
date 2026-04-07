@@ -16,7 +16,7 @@
                    Style="{StaticResource TitleTextBlockStyle}"/>
 
         <!-- Two-column body -->
-        <Grid Grid.Row="1" ColumnSpacing="32">
+        <Grid Grid.Row="1" ColumnSpacing="32" Margin="32">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>

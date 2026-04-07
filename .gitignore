@@ -59,6 +59,10 @@ BundleArtifacts/
 *.appxbundle
 *.appxupload
 
+## Code-signing certificates — never commit private keys
+*.pfx
+*.cer
+
 ## UWP build output bundled into source tree
 **/Deploy/
 **/FullTrust/
