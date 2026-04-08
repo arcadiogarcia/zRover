@@ -61,7 +61,7 @@ public static class DevicePackageManagementTools
         ILogger logger)
     {
         RegisterListDevices(registry, remoteManagers);
-        RegisterGetDeviceInfo(registry, remoteManagers, logger);
+        RegisterGetDeviceInfo(registry, remoteManagers, packageInstall, logger);
         RegisterListInstalledPackages(registry, localPackageManager, remoteManagers, logger);
         RegisterInstallPackage(registry, localPackageManager, stagingManager, remoteManagers, packageInstall, logger);
         RegisterUninstallPackage(registry, localPackageManager, remoteManagers, packageInstall, logger);
@@ -122,13 +122,16 @@ public static class DevicePackageManagementTools
     private static void RegisterGetDeviceInfo(
         IMcpToolRegistry registry,
         RemoteManagerRegistry remoteManagers,
+        PackageInstallManager packageInstall,
         ILogger logger)
     {
         registry.RegisterTool(
             "get_device_info",
-            "Returns hardware and OS information for a device, including its processor architecture. " +
+            "Returns hardware and OS information for a device, including its processor architecture and " +
+            "whether package installation is currently enabled. " +
             "Use 'architecture' to select the correct MSIX before calling request_package_upload: " +
-            "upload an arm64 package for 'arm64' devices and an x64 package for 'x64' devices.",
+            "upload an arm64 package for 'arm64' devices and an x64 package for 'x64' devices. " +
+            "Check 'packageInstallEnabled' before attempting install_package or request_package_upload.",
             $$"""
             {
               "type": "object",
@@ -152,11 +155,12 @@ public static class DevicePackageManagementTools
                 var os   = System.Runtime.InteropServices.RuntimeInformation.OSDescription;
                 return JsonSerializer.Serialize(new
                 {
-                    success      = true,
-                    architecture = arch,
-                    osDescription = os,
-                    processorCount = Environment.ProcessorCount,
-                    machineName  = Environment.MachineName,
+                    success                = true,
+                    architecture           = arch,
+                    osDescription          = os,
+                    processorCount         = Environment.ProcessorCount,
+                    machineName            = Environment.MachineName,
+                    packageInstallEnabled  = packageInstall.IsEnabled,
                 }, JsonOpts);
             });
     }

@@ -90,6 +90,24 @@ public static class MsixPacker
             var sigPath = Path.Combine(tempDir, "AppxSignature.p7x");
             if (File.Exists(sigPath)) File.Delete(sigPath);
 
+            // 3b. Strip the AppxSignature.p7x Override from [Content_Types].xml so the
+            //     AppX SIP does not see a stale content-type entry when signing the
+            //     repacked (unsigned) package. Leaving it in causes 0x80080209.
+            var ctPath = Path.Combine(tempDir, "[Content_Types].xml");
+            if (File.Exists(ctPath))
+            {
+                var ctDoc = XDocument.Load(ctPath);
+                XNamespace ctNs = "http://schemas.openxmlformats.org/package/2006/content-types";
+                ctDoc.Root?
+                    .Elements(ctNs + "Override")
+                    .FirstOrDefault(e => string.Equals(
+                        (string?)e.Attribute("PartName"),
+                        "/AppxSignature.p7x",
+                        StringComparison.OrdinalIgnoreCase))
+                    ?.Remove();
+                ctDoc.Save(ctPath);
+            }
+
             // 4. Pack directory into a new MSIX with fresh AppxBlockMap.xml
             await PackDirectoryAsync(tempDir, tempMsix, ct);
 

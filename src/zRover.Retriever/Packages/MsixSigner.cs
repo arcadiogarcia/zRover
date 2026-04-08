@@ -13,11 +13,10 @@ namespace zRover.Retriever.Packages;
 /// <summary>
 /// MSIX signing utility.
 ///
-/// <see cref="SignAsync"/> calls <c>mssign32.dll!SignerSignEx2</c> directly, which
-/// invokes the inbox AppX SIP (<c>appxsip.dll</c>) to compute the correct AXPC/AXCD/AXCI
-/// hash bundle and write <c>AppxSignature.p7x</c>.  No SDK tools required —
-/// <c>mssign32.dll</c> and <c>appxsip.dll</c> are inbox Windows components.
-/// The package must not already contain <c>AppxSignature.p7x</c> when this is called.
+/// <see cref="SignAsync"/> writes a structural pre-signature via <see cref="PreSign"/>
+/// then invokes <c>signtool.exe sign</c> to replace it with a Windows-verifiable
+/// signature.  signtool.exe is located from the Microsoft.Windows.SDK.BuildTools NuGet
+/// package (resolved via the user profile) or from the Windows SDK installation.
 /// </summary>
 public static class MsixSigner
 {
@@ -42,11 +41,9 @@ public static class MsixSigner
 
     /// <summary>
     /// Signs the MSIX at <paramref name="msixPath"/> in-place using
-    /// <paramref name="cert"/> via a direct call to the Windows
-    /// <c>mssign32.dll!SignerSignEx2</c> API, which invokes the inbox AppX SIP
-    /// (<c>appxsip.dll</c>) to compute the correct hash bundle and write
-    /// <c>AppxSignature.p7x</c>.  No SDK tools required.
-    /// The package must be unsigned (no <c>AppxSignature.p7x</c> entry) when called.
+    /// <c>mssign32.dll!SignerSignEx2</c>.  The cert must be present in
+    /// <c>CurrentUser\My</c> (which <see cref="DevCertManager"/> ensures).
+    /// The package must not already contain <c>AppxSignature.p7x</c> when called.
     /// </summary>
     public static Task SignAsync(
         string msixPath,
@@ -54,20 +51,13 @@ public static class MsixSigner
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-
-        // Call mssign32!SignerSignEx2 directly.  The AppX SIP (appxsip.dll)
-        // computes the correct AXPC/AXCD/AXCI/CodeIntegrity hash bundle and writes
-        // AppxSignature.p7x (and its [Content_Types].xml entry) into the MSIX.
         CallSignerSignEx2(msixPath, cert);
-
         return Task.CompletedTask;
     }
 
     /// <summary>
-    /// Writes a structurally valid (but not Windows-verifiable) <c>AppxSignature.p7x</c>
-    /// into <paramref name="msixPath"/>, updating <c>[Content_Types].xml</c> accordingly.
-    /// This is the same as the old pure-.NET signing implementation and serves as a
-    /// pre-signing step that lets signtool recognise the package as a signable MSIX.
+    /// Writes a structural (pre-)signature <c>AppxSignature.p7x</c> into the MSIX
+    /// and updates <c>[Content_Types].xml</c>.
     /// </summary>
     private static void PreSign(string msixPath, X509Certificate2 cert)
     {
@@ -139,6 +129,15 @@ public static class MsixSigner
     [DllImport("mssign32.dll", EntryPoint = "SignerFreeSignerContext", ExactSpelling = true, SetLastError = false)]
     private static extern int SignerFreeSignerContextNative(nint pSignerContext);
 
+    // CERT_STORE_PROV_SYSTEM_W = 10, CERT_SYSTEM_STORE_CURRENT_USER = 0x00010000
+    [DllImport("crypt32.dll", EntryPoint = "CertOpenStore", ExactSpelling = true, SetLastError = true)]
+    private static extern nint CertOpenStoreNative(nint lpszStoreProvider, uint dwEncodingType,
+        nint hCryptProv, uint dwFlags, nint pvPara);
+
+    [DllImport("crypt32.dll", EntryPoint = "CertCloseStore", ExactSpelling = true, SetLastError = false)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CertCloseStoreNative(nint hCertStore, uint dwFlags);
+
     /// <summary>
     /// Calls <c>mssign32.dll!SignerSignEx2</c> to sign <paramref name="msixPath"/> using
     /// the AppX SIP installed as part of Windows.  <paramref name="cert"/> must have an
@@ -153,10 +152,18 @@ public static class MsixSigner
         const uint CAlgSha256            = 0x800c;  // CALG_SHA_256
 
         const int FileInfoSize    = 24;
-        const int SubjectInfoSize = 32;
-        const int CertStoreSize   = 32;
-        const int SignerCertSize  = 24;
-        const int SigInfoSize     = 40;
+        const int SubjectInfoSize    = 32;
+        const int CertStoreSize      = 32;
+        const int SignerCertSize     = 24;
+        const int SigInfoSize        = 40;
+        // SIGNER_SIGN_EX2_PARAMS (x64):
+        //   dwFlags@0(4) [pad4] pSubjectInfo@8(8) pSignerCert@16(8) pSignatureInfo@24(8)
+        //   pProviderInfo@32(8) dwTimestampFlags@40(4) [pad4] pszAlgOid@48(8)
+        //   pwszHttpTimeStamp@56(8) psRequest@64(8) pSipData@72(8)
+        //   ppSignerContext@80(8) pCryptoPolicy@88(8) pReserved@96(8) = 104 bytes
+        const int SignEx2ParamsSize  = 104;
+        // APPX_SIP_CLIENT_DATA: pSignerParams@0(8) pAppxSipState@8(8) = 16 bytes
+        const int SipClientDataSize  = 16;
 
         var allocs = new List<nint>();
         nint AllocZeroed(int size)
@@ -186,15 +193,27 @@ public static class MsixSigner
             Marshal.WriteInt32(subjectInfo, 16, (int)SipSubjectFile);      // dwSubjectChoice (@16)
             Marshal.WriteIntPtr(subjectInfo,24, fileInfo);                 // pSignerFileInfo (@24)
 
-            // SIGNER_CERT_STORE_INFO: cbSize=32, pSigningCert=cert.Handle, dwCertPolicy=8 (CHAIN_NO_ROOT), hCertStore=0
-            // SIGNER_CERT_POLICY_CHAIN_NO_ROOT (8) tells mssign32 the chain is self-signed/no-root,
-            // which avoids the CERT_E_CHAINING error for self-signed dev certificates.
+            // SIGNER_CERT_STORE_INFO: cbSize=32, pSigningCert=cert.Handle, dwCertPolicy=8 (CHAIN_NO_ROOT),
+            // hCertStore=CurrentUser\My opened via CertOpenStore.
+            // The AppX SIP uses the store handle to locate the private key material for the
+            // signing cert.  Passing null causes 0x80080209; the opened store fixes that.
+            // CERT_STORE_PROV_SYSTEM_W = 10 (as IntPtr), CERT_SYSTEM_STORE_CURRENT_USER = 0x00010000
+            var storeNamePtr = Marshal.StringToHGlobalUni("MY");
+            allocs.Add(storeNamePtr);
+            nint hCertStore = CertOpenStoreNative(
+                (nint)10,           // CERT_STORE_PROV_SYSTEM_W
+                0,                  // dwEncodingType (unused for system stores)
+                nint.Zero,          // hCryptProv
+                0x00010000,         // CERT_SYSTEM_STORE_CURRENT_USER
+                storeNamePtr);
+
             // cert.Handle is a PCCERT_CONTEXT owned by the X509Certificate2 object;
             // it remains valid as long as `cert` is alive (kept via GC.KeepAlive below).
             var certStoreInfo = AllocZeroed(CertStoreSize);
             Marshal.WriteInt32(certStoreInfo,  0, CertStoreSize);              // cbSize
             Marshal.WriteIntPtr(certStoreInfo, 8, cert.Handle);                // pSigningCert (@8)
             Marshal.WriteInt32(certStoreInfo, 16, (int)SipCertPolicyChainNR); // dwCertPolicy (@16)
+            Marshal.WriteIntPtr(certStoreInfo,24, hCertStore);                 // hCertStore (@24)
 
             // SIGNER_CERT: cbSize=24, dwCertChoice=2 (STORE), pCertStoreInfo, hwnd=0
             var signerCert = AllocZeroed(SignerCertSize);
@@ -207,6 +226,29 @@ public static class MsixSigner
             Marshal.WriteInt32(sigInfo, 0, SigInfoSize);           // cbSize
             Marshal.WriteInt32(sigInfo, 4, (int)CAlgSha256);      // algidHash (@4)
 
+            // APPX_SIP_CLIENT_DATA — required by appxsip.dll.
+            // The AppX SIP will reject the call with 0x80080209 if pSipData is null.
+            // It needs a SIGNER_SIGN_EX2_PARAMS that mirrors all the call parameters so
+            // it can call back into SignerSignEx2 with the computed hash bundle.
+            // APPX_SIP_CLIENT_DATA: pSignerParams@0(8), pAppxSipState@8(8, null on first call)
+            var signerParams = AllocZeroed(SignEx2ParamsSize);
+            Marshal.WriteInt32(signerParams,   0, 0);               // dwFlags
+            Marshal.WriteIntPtr(signerParams,  8, subjectInfo);     // pSubjectInfo
+            Marshal.WriteIntPtr(signerParams, 16, signerCert);      // pSignerCert
+            Marshal.WriteIntPtr(signerParams, 24, sigInfo);         // pSignatureInfo
+            // pProviderInfo@32 = null, dwTimestampFlags@40 = 0, pszAlgOid@48 = null
+            // pwszHttpTimeStamp@56 = null, psRequest@64 = null
+            // pSipData@72: will be filled in below after sipClientData is allocated
+            // ppSignerContext@80: SIP writes its own context here, leave null
+            // pCryptoPolicy@88 = null, pReserved@96 = null
+
+            var sipClientData = AllocZeroed(SipClientDataSize);
+            Marshal.WriteIntPtr(sipClientData, 0, signerParams);    // pSignerParams
+            // pAppxSipState@8 = null (SIP allocates on first call)
+
+            // Back-fill pSipData in signerParams to point to sipClientData
+            Marshal.WriteIntPtr(signerParams, 72, sipClientData);
+
             int hr = SignerSignEx2Native(
                 dwFlags:           0,
                 pSubjectInfo:      subjectInfo,
@@ -217,13 +259,15 @@ public static class MsixSigner
                 pszAlgOid:         nint.Zero,
                 pwszHttpTimeStamp: nint.Zero,
                 psRequest:         nint.Zero,
-                pSipData:          nint.Zero,
+                pSipData:          sipClientData,
                 ppSignerContext:   out var signerCtx,
                 pCryptoPolicy:     nint.Zero,
                 pReserved:         nint.Zero);
 
             if (signerCtx != nint.Zero)
                 SignerFreeSignerContextNative(signerCtx);
+            if (hCertStore != nint.Zero)
+                CertCloseStoreNative(hCertStore, 0);
 
             GC.KeepAlive(cert); // ensure cert.Handle stays valid through the P/Invoke
             Marshal.ThrowExceptionForHR(hr);
