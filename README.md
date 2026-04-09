@@ -72,4 +72,4 @@ See the **[full tool reference](docs/integration-guide.md#available-tools)** for
 
 ## Contributing
 
-See the **[Developer Guide](docs/dev-guide.md)** for architecture, project structure, build instructions, and how to run the test suite.
+See the **[Developer Guide](docs/contributing/dev-guide.md)** for architecture, project structure, build instructions, and how to run the test suite.

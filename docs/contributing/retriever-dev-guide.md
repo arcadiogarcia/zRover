@@ -137,7 +137,7 @@ After any manifest change, run `.\deploy-dev.ps1` to rebuild and reinstall.
 
 ## Publishing a Release (GitHub Actions)
 
-The workflow at [`.github/workflows/release-retriever.yml`](../.github/workflows/release-retriever.yml) triggers on version tags (`v1.0.0.0`, `v1.2.3.4`, …) and publishes a GitHub Release with three assets:
+The workflow at [`.github/workflows/release-retriever.yml`](../../.github/workflows/release-retriever.yml) triggers on version tags (`v1.0.0.0`, `v1.2.3.4`, …) and publishes a GitHub Release with three assets:
 
 ```
 zRover.Retriever_1.0.0.0_x64.msix        ← signed MSIX
