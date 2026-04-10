@@ -238,12 +238,14 @@ public class ColorPickerE2ETests : IAsyncLifetime
         var root = doc.RootElement;
         root.GetProperty("success").GetBoolean().Should().BeTrue();
 
-        var width  = root.GetProperty("width").GetInt32();
-        var height = root.GetProperty("height").GetInt32();
-        var path   = root.GetProperty("filePath").GetString()!;
+        var width  = root.GetProperty("bitmapWidth").GetInt32();
+        var height = root.GetProperty("bitmapHeight").GetInt32();
 
         width.Should().BeGreaterThan(100, "screenshot should have reasonable width");
         height.Should().BeGreaterThan(100, "screenshot should have reasonable height");
-        File.Exists(path).Should().BeTrue("screenshot PNG file should exist at returned path");
+
+        // Verify the image content block is also present
+        var imageBlock = result.Content.OfType<ImageContentBlock>().FirstOrDefault();
+        imageBlock.Should().NotBeNull("capture_current_view should return an image content block");
     }
 }

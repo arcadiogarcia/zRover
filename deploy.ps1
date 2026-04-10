@@ -1,163 +1,120 @@
-#!/usr/bin/env pwsh
-# deploy.ps1  — Build and deploy the zRover UWP sample app via CLI.
-# Run from d:\Rover (or any directory).
+﻿#!/usr/bin/env pwsh
+# deploy.ps1 -- Build and deploy the zRover UWP sample app via CLI.
+# Run from any directory -- all paths are derived from the script's own location.
+#
 # Usage:
-#   .\deploy.ps1              # Full build + deploy + launch
-#   .\deploy.ps1 -SkipBuild   # Deploy existing binaries + launch
-#   .\deploy.ps1 -SkipLaunch  # Build + deploy only, don't launch
+#   .\deploy.ps1                        # ARM64 Debug build + deploy + launch
+#   .\deploy.ps1 -Arch x64              # x64 instead of ARM64
+#   .\deploy.ps1 -Config Release        # Release build
+#   .\deploy.ps1 -SkipBuild             # Deploy existing binaries + launch
+#   .\deploy.ps1 -SkipLaunch            # Build + deploy only, don't launch
 
 param(
-    [switch]$SkipBuild,
-    [switch]$SkipLaunch
+    [ValidateSet('ARM64','x64','x86')]
+    [string] $Arch   = 'ARM64',
+    [ValidateSet('Debug','Release')]
+    [string] $Config = 'Debug',
+    [switch] $SkipBuild,
+    [switch] $SkipLaunch
 )
 
 $ErrorActionPreference = "Stop"
 
-$msbuild      = "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe"
-$sampleProj   = "d:\Rover\src\zRover.Uwp.Sample\zRover.Uwp.Sample.csproj"
-$appxManifest = "d:\Rover\src\zRover.Uwp.Sample\bin\x64\Debug\AppX\AppxManifest.xml"
-$pkgFamily    = "zRover.Uwp.Sample_xaf3bmhg52ma0"
+# -- Resolve paths relative to this script ------------------------------------
+$repoRoot     = $PSScriptRoot
+$sampleProj   = Join-Path $repoRoot "src\zRover.Uwp.Sample\zRover.Uwp.Sample.csproj"
+$appxManifest = Join-Path $repoRoot "src\zRover.Uwp.Sample\bin\$Arch\$Config\AppX\AppxManifest.xml"
 
-Write-Host "=== zRover Deploy ===" -ForegroundColor Cyan
+# -- Locate MSBuild (prefer amd64 host; fall back to any VS 2022 install) -----
+function Find-MSBuild {
+    $candidates = @(
+        "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\amd64\MSBuild.exe",
+        "C:\Program Files\Microsoft Visual Studio\2022\Professional\MSBuild\Current\Bin\amd64\MSBuild.exe",
+        "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\amd64\MSBuild.exe",
+        "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe",
+        "C:\Program Files\Microsoft Visual Studio\2022\Professional\MSBuild\Current\Bin\MSBuild.exe",
+        "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe"
+    )
+    foreach ($c in $candidates) { if (Test-Path $c) { return $c } }
 
-# ── 1. Kill running app (releases file locks) ──────────────────────────────
-Write-Host "Stopping app..." -ForegroundColor Yellow
-Get-Process | Where-Object { $_.Name -match "zRover" } |
-    ForEach-Object { Write-Host "  Stopping $($_.Name) ($($_.Id))"; $_ | Stop-Process -Force }
+    # Try vswhere as last resort
+    $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+    if (Test-Path $vswhere) {
+        $vsPath = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -property installationPath 2>$null
+        if ($vsPath) {
+            foreach ($suffix in "MSBuild\Current\Bin\amd64\MSBuild.exe","MSBuild\Current\Bin\MSBuild.exe") {
+                $candidate = Join-Path $vsPath $suffix
+                if (Test-Path $candidate) { return $candidate }
+            }
+        }
+    }
+    throw "MSBuild.exe not found. Install Visual Studio 2022 or set `$env:MSBUILD_PATH."
+}
+
+$msbuild = if ($env:MSBUILD_PATH -and (Test-Path $env:MSBUILD_PATH)) { $env:MSBUILD_PATH } else { Find-MSBuild }
+
+Write-Host "=== zRover Deploy ($Arch | $Config) ===" -ForegroundColor Cyan
+Write-Host "  Repo:    $repoRoot"
+Write-Host "  MSBuild: $msbuild"
+
+# -- 1. Stop running app (releases file locks) --------------------------------
+Write-Host "`nStopping any running zRover processes..." -ForegroundColor Yellow
+Get-Process | Where-Object { $_.Name -match "^zRover" } |
+    ForEach-Object { Write-Host "  Stopping $($_.Name) ($($_.Id))"; $_ | Stop-Process -Force -ErrorAction SilentlyContinue }
 Start-Sleep 2
 
-# ── 2. Build ────────────────────────────────────────────────────────────────
+# -- 2. Build -----------------------------------------------------------------
 if (-not $SkipBuild) {
-    Write-Host "Building zRover.Uwp.Sample..." -ForegroundColor Yellow
-    & $msbuild $sampleProj /p:Configuration=Debug /p:Platform=x64 /t:Build /v:m /nologo
-    if ($LASTEXITCODE -ne 0) { throw "Build failed — check output above." }
+    Write-Host "`nBuilding zRover.Uwp.Sample ($Arch | $Config)..." -ForegroundColor Yellow
+    & $msbuild $sampleProj /p:Configuration=$Config /p:Platform=$Arch /t:Build /v:m /nologo
+    if ($LASTEXITCODE -ne 0) { throw "Build failed - check output above." }
     Write-Host "Build OK." -ForegroundColor Green
 }
 
-# ── 3. Verify key files ─────────────────────────────────────────────────────
+# -- 3. Verify key file -------------------------------------------------------
 if (-not (Test-Path $appxManifest)) {
-    throw "AppxManifest.xml not found at: $appxManifest`nRun without -SkipBuild first."
+    throw "AppxManifest.xml not found at:`n  $appxManifest`nRun without -SkipBuild first, or verify -Arch / -Config match the build."
 }
 
-# ── 4. Register ─────────────────────────────────────────────────────────────
-Write-Host "Registering package..." -ForegroundColor Yellow
-# Remove first to avoid "already installed" error when the layout hasn't changed
-Remove-AppxPackage "zRover.Uwp.Sample_1.0.0.0_x64__xaf3bmhg52ma0" -ErrorAction SilentlyContinue
+# -- 4. Register --------------------------------------------------------------
+Write-Host "`nRegistering package..." -ForegroundColor Yellow
+# Remove any installed version (all architectures) to avoid conflicts
+Get-AppxPackage -Name "zRover.Uwp.Sample" -ErrorAction SilentlyContinue |
+    ForEach-Object { Write-Host "  Removing $($_.PackageFullName)"; Remove-AppxPackage $_ -ErrorAction SilentlyContinue }
 Start-Sleep 1
 Add-AppxPackage -Register $appxManifest -ForceApplicationShutdown
-Write-Host "Registered OK." -ForegroundColor Green
+$installed = Get-AppxPackage -Name "zRover.Uwp.Sample"
+Write-Host "Registered OK -- $($installed.PackageFullName)" -ForegroundColor Green
 
-# ── 5. Launch ────────────────────────────────────────────────────────────────
+# -- 5. Launch ----------------------------------------------------------------
 if (-not $SkipLaunch) {
-    Write-Host "Launching app..." -ForegroundColor Yellow
-    Start-Process "shell:AppsFolder\$pkgFamily!App"
+    $appId     = (Get-AppxPackageManifest $installed).Package.Applications.Application.Id
+    $launchUri = "shell:AppsFolder\$($installed.PackageFamilyName)!$appId"
+
+    Write-Host "`nLaunching app ($launchUri)..." -ForegroundColor Yellow
+    Start-Process $launchUri
 
     Write-Host "Waiting for MCP server (port 5100)..." -ForegroundColor Yellow
     $ready = $false
-    for ($i = 0; $i -lt 20; $i++) {
+    for ($i = 0; $i -lt 30; $i++) {
         Start-Sleep 1
-        $conn = Test-NetConnection localhost -Port 5100 -InformationLevel Quiet -WarningAction SilentlyContinue
-        if ($conn) { $ready = $true; break }
+        $listening = netstat -ano 2>$null | Select-String ":5100 " | Select-String "LISTEN"
+        if ($listening) { $ready = $true; break }
         Write-Host -NoNewline "."
     }
     Write-Host ""
 
     if ($ready) {
-        Write-Host "Port 5100 ready — zRover is running!" -ForegroundColor Green
+        $serverPid  = ($listening[0].ToString() -split '\s+')[-1]
+        $serverProc = Get-Process -Id $serverPid -ErrorAction SilentlyContinue
+        Write-Host "Port 5100 ready -- $($serverProc.Name) (PID $serverPid)" -ForegroundColor Green
     } else {
-        Write-Warning "Port 5100 not listening after 20s. Check event log for errors."
-        Get-WinEvent Application -ErrorAction SilentlyContinue |
+        Write-Warning "Port 5100 not listening after 30s. Check event log for errors."
+        Get-WinEvent -LogName Application -ErrorAction SilentlyContinue |
             Where-Object { $_.TimeCreated -gt (Get-Date).AddMinutes(-2) -and $_.Id -in 1000,1026 } |
             Select-Object -First 3 |
-            ForEach-Object { Write-Host (($_.Message -replace '\s+', ' ')[0..300] -join '') -ForegroundColor Red }
+            ForEach-Object { Write-Host (($_.Message -replace '\s+', ' ').Substring(0, [Math]::Min(300, $_.Message.Length))) -ForegroundColor Red }
     }
 }
 
 Write-Host "`n=== Done ===" -ForegroundColor Cyan
-$dstDll = "$appxDir\zRover.Uwp.dll"
-if (Test-Path $srcDll) {
-    try {
-        $copied = $false
-        # Try normal copy first
-        try {
-            Copy-Item $srcDll $dstDll -Force
-            $copied = $true
-        } catch {
-            # Normal copy failed (file locked) - use FileShare.ReadWrite approach
-            # Rename existing destination first (rename works even when locked)
-            if (Test-Path $dstDll) {
-                Rename-Item $dstDll "$dstDll.old" -Force -ErrorAction SilentlyContinue
-            }
-            # Read source with shared access, write as new file
-            $srcInfo = Get-Item $srcDll
-            $fs = [System.IO.FileStream]::new($srcDll, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]'ReadWrite,Delete')
-            $bytes = New-Object byte[] $fs.Length
-            $null = $fs.Read($bytes, 0, $bytes.Length)
-            $fs.Close()
-            [System.IO.File]::WriteAllBytes($dstDll, $bytes)
-            # Clean up old
-            Remove-Item "$dstDll.old" -Force -ErrorAction SilentlyContinue
-            $copied = $true
-        }
-        if ($copied) {
-            $info = Get-Item $dstDll
-            Write-Host "  Copied $($info.Length) bytes, $($info.LastWriteTime)" -ForegroundColor Green
-        }
-    } catch {
-        Write-Warning "  Could not copy zRover.Uwp.dll: $_"
-    }
-} else {
-    Write-Warning "  Source DLL not found: $srcDll"
-}
-
-# 6. Copy resources.pri from deploy_uwp (deploy_uwp has the correct 10312-byte version)
-Write-Host "Copying resources.pri from deploy_uwp..." -ForegroundColor Yellow
-Copy-Item "$deployDir\resources.pri" "$appxDir\resources.pri" -Force
-Write-Host "  $($(Get-Item "$appxDir\resources.pri").Length) bytes" -ForegroundColor Green
-
-# 7. Copy entrypoint native stub from deploy_uwp
-Write-Host "Copying entrypoint stub..." -ForegroundColor Yellow
-Copy-Item "$deployDir\entrypoint\zRover.Uwp.Sample.exe" "$appxDir\entrypoint\zRover.Uwp.Sample.exe" -Force
-Write-Host "  $($(Get-Item "$appxDir\entrypoint\zRover.Uwp.Sample.exe").Length) bytes" -ForegroundColor Green
-
-# 8. Show final AppX state
-Write-Host "`nAppX state after fixes:" -ForegroundColor Cyan
-Get-ChildItem $appxDir -File | Where-Object {$_.Name -like "zRover*" -or $_.Name -eq "resources.pri" -or $_.Name -eq "AppxManifest.xml"} `
-    | Select-Object Name, Length, LastWriteTime | Format-Table -AutoSize
-
-# 9. Register the package
-Write-Host "Registering package..." -ForegroundColor Yellow
-Add-AppxPackage -Register "$appxDir\AppxManifest.xml" -ForceApplicationShutdown 2>&1 | Out-Null
-$status = (Get-AppxPackage $pkgFull).Status
-Write-Host "  Registration status: $status" -ForegroundColor $(if ($status -eq "Ok") {"Green"} else {"Red"})
-
-if ($status -ne "Ok") {
-    Write-Error "Package registration failed!"
-    exit 1
-}
-
-# 10. Launch and verify
-if (-not $SkipLaunch) {
-    Write-Host "`nLaunching app..." -ForegroundColor Yellow
-    explorer $launchUri
-    Write-Host "Waiting for MCP server to start (up to 20s)..." -ForegroundColor Yellow
-    $started = $false
-    for ($i = 0; $i -lt 20; $i++) {
-        Start-Sleep 1
-        $listening = netstat -ano 2>&1 | Select-String ":5100"
-        if ($listening) {
-            $started = $true
-            break
-        }
-    }
-    
-    if ($started) {
-        Write-Host "SUCCESS - MCP server listening on :5100!" -ForegroundColor Green
-        netstat -ano | Select-String ":5100"
-    } else {
-        Write-Warning "MCP server did not start within 20s. Check manually."
-        Get-Process | Where-Object {$_.Name -like "*zRover*"} | Select-Object Name, Id
-    }
-}
-
-Write-Host "`n=== Deploy complete ===" -ForegroundColor Cyan
