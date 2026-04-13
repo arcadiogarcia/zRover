@@ -13,6 +13,9 @@ on:
 jobs:
   publish:
     runs-on: windows-latest
+    permissions:
+      contents: write   # needed to create GitHub releases and upload assets
+
     steps:
       - uses: actions/checkout@v4
 
@@ -45,6 +48,9 @@ jobs:
           }
           "version=$ver" >> $env:GITHUB_OUTPUT
 
+      - name: Restore NuGet packages
+        run: dotnet restore src/zRover.WinUI/zRover.WinUI.csproj
+
       - name: Build zRover.WinUI (Release)
         run: msbuild src/zRover.WinUI/zRover.WinUI.csproj /p:Configuration=Release /p:Platform=x64 /t:Build /v:minimal
 
@@ -54,8 +60,13 @@ jobs:
       - name: Push to nuget.org
         run: dotnet nuget push src/zRover.WinUI/bin/nupkg/zRover.WinUI.${{ steps.version.outputs.version }}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }} --skip-duplicate
 
-      - name: Upload package artifact
-        uses: actions/upload-artifact@v4
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: zRover.WinUI.${{ steps.version.outputs.version }}.nupkg
-          path: src/zRover.WinUI/bin/nupkg/*.nupkg
+          name: "zRover.WinUI v${{ steps.version.outputs.version }}"
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            src/zRover.WinUI/bin/nupkg/zRover.WinUI.${{ steps.version.outputs.version }}.nupkg
