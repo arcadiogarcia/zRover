@@ -1,0 +1,61 @@
+name: Publish zRover.WinUI NuGet Package
+
+on:
+  push:
+    tags:
+      - 'nuget-winui-v*'   # Triggered by pushing a tag like nuget-winui-v0.1.0-preview
+  workflow_dispatch:        # Manual trigger from GitHub UI
+    inputs:
+      version:
+        description: 'Package version (e.g. 0.1.0-preview). Leave blank to use csproj version.'
+        required: false
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $ver = '${{ github.event.inputs.version }}'
+          if (-not $ver -and '${{ github.ref_type }}' -eq 'tag') {
+            $ver = '${{ github.ref_name }}' -replace '^nuget-winui-v', ''
+          }
+          $projPath = 'src/zRover.WinUI/zRover.WinUI.csproj'
+          if ($ver) {
+            Write-Host "Stamping version $ver into csproj..."
+            $content = Get-Content $projPath -Raw
+            $content = $content -replace '<Version>[^<]+</Version>', "<Version>$ver</Version>"
+            Set-Content $projPath $content -Encoding UTF8
+          } else {
+            $xml = [xml](Get-Content $projPath -Raw)
+            $ver = $xml.Project.PropertyGroup | Where-Object { $_.Version } | Select-Object -First 1 | ForEach-Object { $_.Version }
+            Write-Host "Using csproj version: $ver"
+          }
+          "version=$ver" >> $env:GITHUB_OUTPUT
+
+      - name: Build zRover.WinUI (Release)
+        run: msbuild src/zRover.WinUI/zRover.WinUI.csproj /p:Configuration=Release /p:Platform=x64 /t:Build /v:minimal
+
+      - name: Pack NuGet package
+        run: dotnet pack src/zRover.WinUI/zRover.WinUI.csproj -c Release /p:Platform=x64 --no-build -o src/zRover.WinUI/bin/nupkg
+
+      - name: Push to nuget.org
+        run: dotnet nuget push src/zRover.WinUI/bin/nupkg/zRover.WinUI.${{ steps.version.outputs.version }}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }} --skip-duplicate
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zRover.WinUI.${{ steps.version.outputs.version }}.nupkg
+          path: src/zRover.WinUI/bin/nupkg/*.nupkg

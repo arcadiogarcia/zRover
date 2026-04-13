@@ -11,6 +11,19 @@
     <AssemblyName>zRover.WinUI</AssemblyName>
     <UseWinUI>true</UseWinUI>
     <NoWarn>$(NoWarn);MCPEXP001</NoWarn>
+    <!-- NuGet package metadata -->
+    <PackageId>zRover.WinUI</PackageId>
+    <Version>0.1.0-preview</Version>
+    <Authors>zRover Contributors</Authors>
+    <Description>Add Model Context Protocol (MCP) tool endpoints to any WinUI 3 app. zRover exposes input injection, screenshot capture, coordinate validation, and app-defined action dispatch as MCP tools through an in-process HTTP server — no FullTrust companion process needed. WinUI 3 apps run full-trust, so the MCP server starts directly in-process.
+
+Minimal integration: two lines in App.xaml.cs.</Description>
+    <PackageTags>winui winui3 mcp ai tools input-injection screenshot model-context-protocol</PackageTags>
+    <PackageProjectUrl>https://github.com/ArcadioG/zRover</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/ArcadioG/zRover</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
   <ItemGroup>
@@ -25,9 +38,29 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
+  <!-- Core and Mcp are not published to NuGet separately; bundle their DLLs directly into this package -->
   <ItemGroup>
-    <ProjectReference Include="..\zRover.Core\zRover.Core.csproj" />
-    <ProjectReference Include="..\zRover.Mcp\zRover.Mcp.csproj" />
+    <ProjectReference Include="..\zRover.Core\zRover.Core.csproj">
+      <PrivateAssets>all</PrivateAssets>
+    </ProjectReference>
+    <ProjectReference Include="..\zRover.Mcp\zRover.Mcp.csproj">
+      <PrivateAssets>all</PrivateAssets>
+    </ProjectReference>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);BundleDependencyDlls</TargetsForTfmSpecificBuildOutput>
+  </PropertyGroup>
+
+  <Target Name="BundleDependencyDlls">
+    <ItemGroup>
+      <BuildOutputInPackage Include="$(OutputPath)zRover.Core.dll" />
+      <BuildOutputInPackage Include="$(OutputPath)zRover.Mcp.dll" />
+    </ItemGroup>
+  </Target>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>
