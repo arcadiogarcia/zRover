@@ -505,10 +505,6 @@ namespace zRover.WinUI.Capabilities
                 if (string.IsNullOrEmpty(req.Name) && string.IsNullOrEmpty(req.AutomationName) && string.IsNullOrEmpty(req.TypeName))
                     return JsonConvert.SerializeObject(new TapElementResponse { Success = false, Error = "At least one of 'name', 'automationName', or 'type' is required." });
 
-                var windowContent = _window?.Content as Microsoft.UI.Xaml.FrameworkElement;
-                if (windowContent == null)
-                    return JsonConvert.SerializeObject(new TapElementResponse { Success = false, Error = "Window content not available." });
-
                 var criteria = new ElementSearchHelper.SearchCriteria
                 {
                     Name = req.Name,
@@ -518,15 +514,31 @@ namespace zRover.WinUI.Capabilities
                     Index = req.Index
                 };
 
-                List<ElementSearchHelper.ElementMatch> matches;
+                // All XAML property access (including _window.Content) must happen on the UI thread
+                List<ElementSearchHelper.ElementMatch> matches = new();
                 if (_runOnUiThread != null)
                 {
-                    matches = await ElementSearchHelper.FindElementsWithTimeoutAsync(
-                        _runOnUiThread, windowContent, criteria, req.Timeout, req.Poll).ConfigureAwait(false);
+                    var deadline = req.Timeout > 0 ? DateTime.UtcNow.AddMilliseconds(req.Timeout) : DateTime.MinValue;
+                    do
+                    {
+                        await _runOnUiThread(() =>
+                        {
+                            var windowContent = _window?.Content as Microsoft.UI.Xaml.FrameworkElement;
+                            if (windowContent != null)
+                                matches = ElementSearchHelper.FindElements(windowContent, criteria);
+                            return Task.CompletedTask;
+                        }).ConfigureAwait(false);
+
+                        if (matches.Count > 0) break;
+                        if (req.Timeout <= 0) break;
+                        await Task.Delay(Math.Max(50, req.Poll)).ConfigureAwait(false);
+                    } while (DateTime.UtcNow < deadline);
                 }
                 else
                 {
-                    matches = ElementSearchHelper.FindElements(windowContent, criteria);
+                    var windowContent = _window?.Content as Microsoft.UI.Xaml.FrameworkElement;
+                    if (windowContent != null)
+                        matches = ElementSearchHelper.FindElements(windowContent, criteria);
                 }
 
                 if (matches.Count == 0)
@@ -590,10 +602,6 @@ namespace zRover.WinUI.Capabilities
                 if (string.IsNullOrEmpty(req.Name) && string.IsNullOrEmpty(req.AutomationName) && string.IsNullOrEmpty(req.TypeName))
                     return JsonConvert.SerializeObject(new ActivateElementResponse { Success = false, Error = "At least one of 'name', 'automationName', or 'type' is required." });
 
-                var windowContent = _window?.Content as Microsoft.UI.Xaml.FrameworkElement;
-                if (windowContent == null)
-                    return JsonConvert.SerializeObject(new ActivateElementResponse { Success = false, Error = "Window content not available." });
-
                 var criteria = new ElementSearchHelper.SearchCriteria
                 {
                     Name = req.Name,
@@ -602,15 +610,31 @@ namespace zRover.WinUI.Capabilities
                     ParentName = req.Parent
                 };
 
-                List<ElementSearchHelper.ElementMatch> matches;
+                // All XAML property access (including _window.Content) must happen on the UI thread
+                List<ElementSearchHelper.ElementMatch> matches = new();
                 if (_runOnUiThread != null)
                 {
-                    matches = await ElementSearchHelper.FindElementsWithTimeoutAsync(
-                        _runOnUiThread, windowContent, criteria, req.Timeout, req.Poll).ConfigureAwait(false);
+                    var deadline = req.Timeout > 0 ? DateTime.UtcNow.AddMilliseconds(req.Timeout) : DateTime.MinValue;
+                    do
+                    {
+                        await _runOnUiThread(() =>
+                        {
+                            var windowContent = _window?.Content as Microsoft.UI.Xaml.FrameworkElement;
+                            if (windowContent != null)
+                                matches = ElementSearchHelper.FindElements(windowContent, criteria);
+                            return Task.CompletedTask;
+                        }).ConfigureAwait(false);
+
+                        if (matches.Count > 0) break;
+                        if (req.Timeout <= 0) break;
+                        await Task.Delay(Math.Max(50, req.Poll)).ConfigureAwait(false);
+                    } while (DateTime.UtcNow < deadline);
                 }
                 else
                 {
-                    matches = ElementSearchHelper.FindElements(windowContent, criteria);
+                    var windowContent = _window?.Content as Microsoft.UI.Xaml.FrameworkElement;
+                    if (windowContent != null)
+                        matches = ElementSearchHelper.FindElements(windowContent, criteria);
                 }
 
                 if (matches.Count == 0)
