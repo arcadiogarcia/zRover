@@ -32,6 +32,12 @@ namespace zRover.Core.Tools.InputInjection
         public string? Parent { get; set; }
 
 #if !WINDOWS_UWP
+        [JsonPropertyName("text")]
+#endif
+        [JsonProperty("text")]
+        public string? Text { get; set; }
+
+#if !WINDOWS_UWP
         [JsonPropertyName("action")]
 #endif
         [JsonProperty("action")]

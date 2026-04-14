@@ -502,8 +502,8 @@ namespace zRover.WinUI.Capabilities
                 var req = JsonConvert.DeserializeObject<TapElementRequest>(argsJson)
                           ?? new TapElementRequest();
 
-                if (string.IsNullOrEmpty(req.Name) && string.IsNullOrEmpty(req.AutomationName) && string.IsNullOrEmpty(req.TypeName))
-                    return JsonConvert.SerializeObject(new TapElementResponse { Success = false, Error = "At least one of 'name', 'automationName', or 'type' is required." });
+                if (string.IsNullOrEmpty(req.Name) && string.IsNullOrEmpty(req.AutomationName) && string.IsNullOrEmpty(req.TypeName) && string.IsNullOrEmpty(req.Text))
+                    return JsonConvert.SerializeObject(new TapElementResponse { Success = false, Error = "At least one of 'name', 'automationName', 'type', or 'text' is required." });
 
                 var criteria = new ElementSearchHelper.SearchCriteria
                 {
@@ -511,6 +511,7 @@ namespace zRover.WinUI.Capabilities
                     AutomationName = req.AutomationName,
                     TypeName = req.TypeName,
                     ParentName = req.Parent,
+                    Text = req.Text,
                     Index = req.Index
                 };
 
@@ -599,15 +600,16 @@ namespace zRover.WinUI.Capabilities
                 var req = JsonConvert.DeserializeObject<ActivateElementRequest>(argsJson)
                           ?? new ActivateElementRequest();
 
-                if (string.IsNullOrEmpty(req.Name) && string.IsNullOrEmpty(req.AutomationName) && string.IsNullOrEmpty(req.TypeName))
-                    return JsonConvert.SerializeObject(new ActivateElementResponse { Success = false, Error = "At least one of 'name', 'automationName', or 'type' is required." });
+                if (string.IsNullOrEmpty(req.Name) && string.IsNullOrEmpty(req.AutomationName) && string.IsNullOrEmpty(req.TypeName) && string.IsNullOrEmpty(req.Text))
+                    return JsonConvert.SerializeObject(new ActivateElementResponse { Success = false, Error = "At least one of 'name', 'automationName', 'type', or 'text' is required." });
 
                 var criteria = new ElementSearchHelper.SearchCriteria
                 {
                     Name = req.Name,
                     AutomationName = req.AutomationName,
                     TypeName = req.TypeName,
-                    ParentName = req.Parent
+                    ParentName = req.Parent,
+                    Text = req.Text
                 };
 
                 // All XAML property access (including _window.Content) must happen on the UI thread

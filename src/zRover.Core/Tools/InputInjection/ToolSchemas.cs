@@ -265,6 +265,7 @@ namespace zRover.Core.Tools.InputInjection
     ""automationName"": { ""type"": ""string"", ""description"": ""AutomationProperties.Name to match (substring, case-insensitive)."" },
     ""type"": { ""type"": ""string"", ""description"": ""XAML element type name (e.g. 'Button', 'TextBlock', 'TextBox'). Exact match, case-insensitive."" },
     ""parent"": { ""type"": ""string"", ""description"": ""Optional parent element name to scope the search under."" },
+    ""text"": { ""type"": ""string"", ""description"": ""Text content to match (substring, case-insensitive). Matches TextBlock.Text, TextBox.Text, or ContentControl string content."" },
     ""index"": { ""type"": ""integer"", ""default"": -1, ""description"": ""0-based index when multiple elements match. -1 (default) returns the first match."" },
     ""device"": { ""type"": ""string"", ""enum"": [""touch"", ""mouse""], ""default"": ""touch"" },
     ""button"": { ""type"": ""string"", ""enum"": [""left"", ""right""], ""default"": ""left"" },
@@ -306,7 +307,8 @@ namespace zRover.Core.Tools.InputInjection
     ""automationName"": { ""type"": ""string"", ""description"": ""AutomationProperties.Name to match (substring, case-insensitive)."" },
     ""type"": { ""type"": ""string"", ""description"": ""XAML element type name (e.g. 'Button', 'CheckBox'). Exact match, case-insensitive."" },
     ""parent"": { ""type"": ""string"", ""description"": ""Optional parent element name to scope the search under."" },
-    ""action"": { ""type"": ""string"", ""enum"": [""invoke"", ""toggle"", ""select"", ""expand"", ""collapse"", ""focus""], ""default"": ""invoke"", ""description"": ""Action to perform via XAML AutomationPeer. 'invoke' clicks buttons, 'toggle' toggles checkboxes/toggle buttons, 'select' selects list items, 'expand'/'collapse' for expandable controls, 'focus' sets keyboard focus."" },
+    ""text"": { ""type"": ""string"", ""description"": ""Text content to match (substring, case-insensitive). Matches TextBlock.Text, TextBox.Text, or ContentControl string content."" },
+    ""action"": { ""type"": ""string"",""enum"": [""invoke"", ""toggle"", ""select"", ""expand"", ""collapse"", ""focus""], ""default"": ""invoke"", ""description"": ""Action to perform via XAML AutomationPeer. 'invoke' clicks buttons, 'toggle' toggles checkboxes/toggle buttons, 'select' selects list items, 'expand'/'collapse' for expandable controls, 'focus' sets keyboard focus."" },
     ""timeout"": { ""type"": ""integer"", ""default"": 0, ""description"": ""Milliseconds to wait for the element to appear. 0 = no wait."" },
     ""poll"": { ""type"": ""integer"", ""default"": 500, ""description"": ""Polling interval in ms during timeout."" }
   }
