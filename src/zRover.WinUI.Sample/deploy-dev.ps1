@@ -62,16 +62,23 @@ if (-not $SkipBuild) {
 }
 
 # ── 3. Locate AppX layout produced by WinAppSDK tooling ──────────────────────
+# Older SDK/VS builds put the layout in a nested AppX\ subfolder; newer ones
+# put it directly in the bin output directory. Accept either.
 $BinDir    = Join-Path $ProjectDir "bin\$Arch\$Config\net8.0-windows10.0.19041.0"
 $LayoutDir = Join-Path $BinDir "AppX"
 if (-not (Test-Path $LayoutDir)) {
-    throw "AppX layout not found at $LayoutDir - did the build succeed?"
+    if (Test-Path (Join-Path $BinDir "AppxManifest.xml")) {
+        $LayoutDir = $BinDir
+    } else {
+        throw "AppX layout not found at $LayoutDir (or $BinDir) - did the build succeed?"
+    }
 }
 Write-Host "Layout: $LayoutDir"
 
 # WinAppSDK MSIX packaging targets don't refresh the AppX layout on incremental
-# builds, so we manually copy zRover.* DLLs from the regular bin output to AppX.
-if (-not $SkipBuild) {
+# builds, so we always copy zRover.* DLLs from the regular bin output to AppX.
+# Skip when LayoutDir IS BinDir to avoid self-copy errors.
+if ($LayoutDir -ne $BinDir) {
     Get-ChildItem $BinDir -Filter 'zRover.*.dll' | ForEach-Object {
         $dest = Join-Path $LayoutDir $_.Name
         if (Test-Path $dest) { Copy-Item $_.FullName $dest -Force }
