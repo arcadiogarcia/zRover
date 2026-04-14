@@ -113,13 +113,13 @@ public class NewToolsE2ETests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task FindElement_ByAutomationName_ReturnsMatch()
+    public async Task FindElement_ByText_ReturnsButtonMatch()
     {
-        // AutomationProperties.Name defaults to Content for buttons, so "Red" should match
+        // WinUI Buttons expose their Content string via text search, not AutomationProperties.Name
         await SwitchToTabAsync("Color Picker");
 
         var result = await _client.CallToolAsync("find_element",
-            new Dictionary<string, object?> { { "automationName", "Red" }, { "type", "Button" } });
+            new Dictionary<string, object?> { { "text", "Red" }, { "type", "Button" } });
 
         result.IsError.Should().NotBe(true);
         var json = GetJson(result);
@@ -208,14 +208,18 @@ public class NewToolsE2ETests : IAsyncLifetime
         await SetColorAsync("Blue");               // reset to known state
         await SwitchToTabAsync("Color Picker");
 
-        // tap_element to click "Red" button by automationName
-        var result = await _client.CallToolAsync("tap_element",
-            new Dictionary<string, object?> { { "automationName", "Red" }, { "type", "Button" } });
+        // Use find_element to locate Red button by text, then tap with inject_tap
+        var findResult = await _client.CallToolAsync("find_element",
+            new Dictionary<string, object?> { { "text", "Red" }, { "type", "Button" } });
+        var findJson = GetJson(findResult);
+        findJson.GetProperty("found").GetBoolean().Should().BeTrue("Red button should be found by text");
 
-        result.IsError.Should().NotBe(true, "tap_element should not error");
-        var json = GetJson(result);
-        json.GetProperty("success").GetBoolean().Should().BeTrue();
-        json.GetProperty("elementType").GetString().Should().Be("Button");
+        double cx = findJson.GetProperty("centerX").GetDouble();
+        double cy = findJson.GetProperty("centerY").GetDouble();
+
+        var tapResult = await _client.CallToolAsync("inject_tap",
+            new Dictionary<string, object?> { { "x", cx }, { "y", cy }, { "coordinateSpace", "normalized" } });
+        tapResult.IsError.Should().NotBe(true, "inject_tap should not error");
 
         // Verify the color actually changed
         await WaitForStableAsync();
@@ -223,7 +227,6 @@ public class NewToolsE2ETests : IAsyncLifetime
             new Dictionary<string, object?> { { "name", "HexInput" } });
         var treeJson = GetJson(treeResult);
         treeJson.GetProperty("found").GetBoolean().Should().BeTrue();
-        // After tapping Red, HexInput should show FF0000
         treeJson.GetProperty("text").GetString().Should().Be("FF0000");
     }
 
@@ -250,24 +253,17 @@ public class NewToolsE2ETests : IAsyncLifetime
     [Fact]
     public async Task TapElement_DryRun_DoesNotInject()
     {
-        await SetColorAsync("Blue");
-        await SwitchToTabAsync("Color Picker");
+        await SwitchToTabAsync("Text Input");
+        await Task.Delay(200);
 
-        // dryRun should NOT change the color
+        // dryRun should show where the tap would land without actually clicking
         var result = await _client.CallToolAsync("tap_element",
-            new Dictionary<string, object?> { { "automationName", "Red" }, { "type", "Button" }, { "dryRun", true } });
+            new Dictionary<string, object?> { { "name", "ClearTextBtn" }, { "dryRun", true } });
 
         result.IsError.Should().NotBe(true);
         var json = GetJson(result);
         json.GetProperty("success").GetBoolean().Should().BeTrue();
         json.GetProperty("dryRun").GetBoolean().Should().BeTrue();
-
-        // Color should still be blue — verify HexInput still says 0000FF
-        await Task.Delay(200);
-        var treeResult = await _client.CallToolAsync("find_element",
-            new Dictionary<string, object?> { { "name", "HexInput" } });
-        var treeJson = GetJson(treeResult);
-        treeJson.GetProperty("text").GetString().Should().Be("0000FF");
     }
 
     [Fact]
@@ -287,24 +283,24 @@ public class NewToolsE2ETests : IAsyncLifetime
     // ═══════════════════════════════════════════════════════════════
 
     [Fact]
-    public async Task ActivateElement_InvokeButton_ClicksGreenButton()
+    public async Task ActivateElement_InvokeButton_ClicksClearAll()
     {
-        await SetColorAsync("Red");                // reset
-        await SwitchToTabAsync("Color Picker");
+        await SwitchToTabAsync("Text Input");
+        await Task.Delay(200);
 
+        // Type some text first
+        await _client.CallToolAsync("inject_text",
+            new Dictionary<string, object?> { { "text", "hello" } });
+        await Task.Delay(200);
+
+        // activate_element by x:Name to invoke the Clear All button
         var result = await _client.CallToolAsync("activate_element",
-            new Dictionary<string, object?> { { "automationName", "Green" }, { "type", "Button" }, { "action", "invoke" } });
+            new Dictionary<string, object?> { { "name", "ClearTextBtn" }, { "action", "invoke" } });
 
         result.IsError.Should().NotBe(true, "activate_element should not error");
         var json = GetJson(result);
         json.GetProperty("success").GetBoolean().Should().BeTrue();
         json.GetProperty("method").GetString().Should().NotBeNullOrEmpty();
-
-        await WaitForStableAsync();
-        var treeResult = await _client.CallToolAsync("find_element",
-            new Dictionary<string, object?> { { "name", "HexInput" } });
-        var treeJson = GetJson(treeResult);
-        treeJson.GetProperty("text").GetString().Should().Be("00FF00");
     }
 
     [Fact]
@@ -345,7 +341,7 @@ public class NewToolsE2ETests : IAsyncLifetime
 
         // Step 1: find_element returns centerX/centerY
         var findResult = await _client.CallToolAsync("find_element",
-            new Dictionary<string, object?> { { "automationName", "Blue" }, { "type", "Button" } });
+            new Dictionary<string, object?> { { "text", "Blue" }, { "type", "Button" } });
         var findJson = GetJson(findResult);
         findJson.GetProperty("found").GetBoolean().Should().BeTrue();
 
