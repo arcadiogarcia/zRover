@@ -37,6 +37,8 @@ namespace zRover.WinUI.Sample
             RedSlider.ValueChanged += Slider_ValueChanged;
             GreenSlider.ValueChanged += Slider_ValueChanged;
             BlueSlider.ValueChanged += Slider_ValueChanged;
+            HexInput.KeyDown += HexInput_KeyDown;
+            HexInput.LostFocus += HexInput_LostFocus;
 
             zRover.WinUI.RoverMcp.Log("MainPage", "MainPage initialized");
 
@@ -107,12 +109,40 @@ namespace zRover.WinUI.Sample
             byte b = (byte)BlueSlider.Value;
 
             PreviewBrush.Color = Color.FromArgb(255, r, g, b);
-            HexLabel.Text = $"#{r:X2}{g:X2}{b:X2}";
+            if (HexInput != null) HexInput.Text = $"{r:X2}{g:X2}{b:X2}";
             RedValue.Text = r.ToString();
             GreenValue.Text = g.ToString();
             BlueValue.Text = b.ToString();
 
             zRover.WinUI.RoverMcp.Log("MainPage.ColorPicker", $"Color updated: #{r:X2}{g:X2}{b:X2} (R={r}, G={g}, B={b})");
+        }
+
+        private void HexInput_KeyDown(object sender, KeyRoutedEventArgs e)
+        {
+            if (e.Key == Windows.System.VirtualKey.Enter)
+                ApplyHexInput();
+        }
+
+        private void HexInput_LostFocus(object sender, RoutedEventArgs e)
+        {
+            ApplyHexInput();
+        }
+
+        private void ApplyHexInput()
+        {
+            var hex = HexInput.Text.Trim().TrimStart('#');
+            if (hex.Length != 6) return;
+            try
+            {
+                byte r = Convert.ToByte(hex.Substring(0, 2), 16);
+                byte g = Convert.ToByte(hex.Substring(2, 2), 16);
+                byte b = Convert.ToByte(hex.Substring(4, 2), 16);
+                RedSlider.Value = r;
+                GreenSlider.Value = g;
+                BlueSlider.Value = b;
+                zRover.WinUI.RoverMcp.Log("MainPage.ColorPicker", $"Hex input applied: #{hex.ToUpper()}");
+            }
+            catch { /* ignore bad input */ }
         }
 
         #endregion

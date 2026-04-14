@@ -181,10 +181,10 @@
                     </Rectangle.Fill>
                 </Rectangle>
 
-                <!-- Row 5: Hex color readout -->
-                <TextBlock x:Name="HexLabel"
+                <!-- Row 5: Hex color input (editable — type RRGGBB and press Enter) -->
+                <TextBox x:Name="HexInput"
                         Grid.Row="5"
-                        Text="#000000"
+                        Text="000000"
                         FontSize="28"
                         FontFamily="Consolas"
                         HorizontalAlignment="Center"
