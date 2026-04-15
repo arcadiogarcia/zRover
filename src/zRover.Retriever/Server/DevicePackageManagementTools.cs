@@ -284,6 +284,10 @@ public static class DevicePackageManagementTools
                 "deferRegistration": {
                   "type": "boolean",
                   "description": "Stage but defer registration to next app launch. Default: false."
+                },
+                "skipSigning": {
+                  "type": "boolean",
+                  "description": "Skip the automatic dev-cert re-signing step. Use for packages already signed by a trusted publisher (e.g. official framework packages). Default: false."
                 }
               }
             }
@@ -330,6 +334,7 @@ public static class DevicePackageManagementTools
                     AllowUnsigned     = GetBool(root, "allowUnsigned", false),
                     InstallForAllUsers = GetBool(root, "installForAllUsers", false),
                     DeferRegistration = GetBool(root, "deferRegistration", false),
+                    SkipSigning       = GetBool(root, "skipSigning", false),
                 };
 
                 var result = await local.InstallPackageAsync(packageUri, options);

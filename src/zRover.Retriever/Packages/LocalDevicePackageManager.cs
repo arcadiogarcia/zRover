@@ -139,7 +139,8 @@ public sealed class LocalDevicePackageManager : IDevicePackageManager
 
         // Auto-sign local MSIX/APPX files using the dev cert managed by DevCertManager.
         // This covers both staged uploads and direct file:// installs.
-        if (uri.IsFile)
+        // Skipped when options.SkipSigning is true (e.g. already-trusted publisher packages).
+        if (uri.IsFile && !options.SkipSigning)
         {
             var localPath = uri.LocalPath;
             var ext = Path.GetExtension(localPath);

@@ -38,4 +38,13 @@ public sealed class InstallOptions
     /// Default: false.
     /// </summary>
     public bool DeferRegistration { get; init; }
+
+    /// <summary>
+    /// Skip the automatic re-signing step for local/staged MSIX files.
+    /// Use this for packages that are already signed by a trusted publisher
+    /// (e.g. officially signed framework packages or Store apps) — re-signing them
+    /// with the dev cert would invalidate their original signature.
+    /// Default: false (auto-sign is applied).
+    /// </summary>
+    public bool SkipSigning { get; init; }
 }
