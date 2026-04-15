@@ -17,6 +17,7 @@ namespace zRover.Mcp
     public sealed class McpToolRegistryAdapter : IMcpToolRegistry
     {
         private readonly McpServerPrimitiveCollection<McpServerTool> _tools = new McpServerPrimitiveCollection<McpServerTool>();
+        private readonly HashSet<string> _registeredNames = new HashSet<string>(StringComparer.Ordinal);
 
         public McpServerPrimitiveCollection<McpServerTool> Tools => _tools;
 
@@ -27,6 +28,7 @@ namespace zRover.Mcp
             Func<string, Task<string>> handler)
         {
             _tools.Add(new DelegateMcpServerTool(name, description, inputSchema, handler));
+            _registeredNames.Add(name);
         }
 
         public void RegisterTool(
@@ -36,6 +38,7 @@ namespace zRover.Mcp
             Func<string, Task<RoverToolResult>> handler)
         {
             _tools.Add(new RichDelegateMcpServerTool(name, description, inputSchema, handler));
+            _registeredNames.Add(name);
         }
 
         /// <summary>
@@ -60,8 +63,7 @@ namespace zRover.Mcp
         /// Used by <see cref="ActiveSessionProxy"/> to avoid double-registering tools
         /// that are already present from the device management layer.
         /// </summary>
-        public bool IsToolRegistered(string name) =>
-            _tools.Any(t => t.ProtocolTool.Name == name);
+        public bool IsToolRegistered(string name) => _registeredNames.Contains(name);
     }
 
     /// <summary>
