@@ -69,6 +69,6 @@ public static class PackageStagingEndpoint
                 stagingId = result.StagingId!,
                 sizeBytes = result.SizeBytes!.Value,
             });
-        });
+        }).DisableRequestSizeLimit();
     }
 }
