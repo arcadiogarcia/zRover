@@ -42,6 +42,16 @@ public sealed class ActiveSessionProxy
     private bool _toolsInitialised;
     private readonly object _initLock = new();
 
+    /// <summary>
+    /// Whether proxy (app-interaction) tools have been registered in the adapter.
+    /// Used by external callers to decide whether a <c>tools/list_changed</c>
+    /// notification is meaningful at this point in time.
+    /// </summary>
+    public bool IsInitialized
+    {
+        get { lock (_initLock) return _toolsInitialised; }
+    }
+
     public ActiveSessionProxy(
         ISessionRegistry sessions,
         McpToolRegistryAdapter adapter,
@@ -83,10 +93,25 @@ public sealed class ActiveSessionProxy
         {
             if (_toolsInitialised) return; // another thread beat us here
 
-            _logger.LogInformation("Initialising proxy tool skeleton from session {SessionId} ({DisplayName}): {Count} tools",
-                session.SessionId, session.Identity.DisplayName, tools.Count);
+            // Filter out tools already registered by the device management layer
+            // (e.g. when a PropagatedSession returns the full remote tool list which
+            // includes list_devices, install_package, etc.).
+            // Also handles the race where a WinUI app registers before its MCP server
+            // has published any tools — in that case we skip and let the next session try.
+            var newTools = tools.Where(t => !_adapter.IsToolRegistered(t.Name)).ToList();
 
-            foreach (var tool in tools)
+            if (newTools.Count == 0)
+            {
+                _logger.LogWarning(
+                    "Session {SessionId} ({DisplayName}) produced no new proxy tools (list was empty or all already registered). Will retry with the next session.",
+                    session.SessionId, session.Identity.DisplayName);
+                return;
+            }
+
+            _logger.LogInformation("Initialising proxy tool skeleton from session {SessionId} ({DisplayName}): {Count} new tools ({Total} total from session)",
+                session.SessionId, session.Identity.DisplayName, newTools.Count, tools.Count);
+
+            foreach (var tool in newTools)
             {
                 var capturedName = tool.Name;
                 _adapter.RegisterTool(tool.Name, tool.Description, tool.InputSchema,

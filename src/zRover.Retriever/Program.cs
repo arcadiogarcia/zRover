@@ -239,9 +239,18 @@ public class Program
         PackageStagingEndpoint.MapStagingEndpoints(webApp, stagingManager);
 
         // ── Fire tools/list_changed when sessions change (enables real-time sync) ──
+        // Only notify when proxy tools are already initialised. If they aren't, the
+        // OnSessionRegisteredAsync path will send the authoritative notification once
+        // tool registration completes, avoiding a race where clients re-fetch the list
+        // before interaction tools (capture_view, inject_tap, …) are registered.
         var sessionRegistry = webApp.Services.GetRequiredService<SessionRegistry>();
         var toolAdapter = webApp.Services.GetRequiredService<McpToolRegistryAdapter>();
-        sessionRegistry.SessionsChanged += (_, _) => toolAdapter.NotifyToolsChanged();
+        var activeProxy = webApp.Services.GetRequiredService<ActiveSessionProxy>();
+        sessionRegistry.SessionsChanged += (_, _) =>
+        {
+            if (activeProxy.IsInitialized)
+                toolAdapter.NotifyToolsChanged();
+        };
 
         // ── Launch web host on background thread, WinUI on main (STA) thread ────
         _ = Task.Run(async () =>

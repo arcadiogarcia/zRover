@@ -54,6 +54,14 @@ namespace zRover.Mcp
             _tools.Add(sentinel);
             _tools.Remove(sentinel);
         }
+
+        /// <summary>
+        /// Returns <c>true</c> when a tool with the given name is already registered.
+        /// Used by <see cref="ActiveSessionProxy"/> to avoid double-registering tools
+        /// that are already present from the device management layer.
+        /// </summary>
+        public bool IsToolRegistered(string name) =>
+            _tools.Any(t => t.ProtocolTool.Name == name);
     }
 
     /// <summary>
