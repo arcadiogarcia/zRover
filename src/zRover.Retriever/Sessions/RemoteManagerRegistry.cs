@@ -404,17 +404,28 @@ public sealed class RemoteManagerRegistry : IDisposable
             var propagatedId = $"{connection.ManagerId}:{app.SessionId}";
             newIds.Add(propagatedId);
 
-            // Check if we already have this session
-            var existing = _sessionRegistry.Sessions.FirstOrDefault(s => s.SessionId == propagatedId);
-            if (existing != null)
+            // Check if we already have this session — guard under _lock so concurrent
+            // SyncRemoteSessionsAsync calls can't both pass this check and add a duplicate.
+            bool shouldAdd = false;
+            lock (_lock)
             {
-                // Update connected state if changed
+                if (!connection.PropagatedSessionIds.Contains(propagatedId))
+                {
+                    // Reserve the slot immediately inside the lock so no concurrent sync
+                    // can add the same ID again before we finish constructing the session.
+                    connection.PropagatedSessionIds.Add(propagatedId);
+                    shouldAdd = true;
+                }
+            }
+
+            if (!shouldAdd)
+            {
+                // Session already tracked — just refresh its connected state.
+                var existing = _sessionRegistry.Sessions.FirstOrDefault(s => s.SessionId == propagatedId);
                 if (existing is PropagatedSession ps)
                     ps.IsConnected = app.IsConnected;
                 continue;
             }
-
-            // Create propagated session
             var identity = new RoverAppIdentity(app.AppName, app.Version, app.InstanceId);
             var origin = new SessionOrigin
             {
@@ -434,7 +445,6 @@ public sealed class RemoteManagerRegistry : IDisposable
                 origin);
 
             _sessionRegistry.Add(propagated);
-            connection.PropagatedSessionIds.Add(propagatedId);
             await _activeSessionProxy.OnSessionRegisteredAsync(propagated);
 
             _logger.LogInformation("Propagated session: {DisplayName} as {PropagatedId}",
@@ -442,14 +452,19 @@ public sealed class RemoteManagerRegistry : IDisposable
         }
 
         // Remove propagated sessions that no longer exist on the remote manager
-        var stale = connection.PropagatedSessionIds
-            .Where(id => !newIds.Contains(id))
-            .ToList();
+        List<string> stale;
+        lock (_lock)
+        {
+            stale = connection.PropagatedSessionIds
+                .Where(id => !newIds.Contains(id))
+                .ToList();
+            foreach (var id in stale)
+                connection.PropagatedSessionIds.Remove(id);
+        }
 
         foreach (var id in stale)
         {
             _sessionRegistry.Remove(id);
-            connection.PropagatedSessionIds.Remove(id);
             _logger.LogInformation("Removed stale propagated session {SessionId}", id);
         }
 
