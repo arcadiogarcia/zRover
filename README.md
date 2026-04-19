@@ -53,14 +53,14 @@ Invoke-WebRequest $cerUrl -OutFile $cer
 Import-Certificate -FilePath $cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
 Remove-Item $cer
 
-# 2. Install (or update) the MSIX
+# 2. Install (or update) the MSIX for all users
 $msix = "$env:TEMP\zRover.Retriever.msix"
 Invoke-WebRequest $msixUrl -OutFile $msix
-Add-AppxPackage $msix
+Add-AppxProvisionedPackage -Online -PackagePath $msix -SkipLicense
 Remove-Item $msix
 ```
 
-> **Updating:** Run only step 2 for subsequent releases. The certificate only needs to be trusted once per machine.
+> **Updating:** Run only step 2 for subsequent releases. The certificate only needs to be trusted once per machine. `Add-AppxProvisionedPackage` installs the app for all users on the machine.
 
 Download links and release notes for all versions are on the [Releases page](https://github.com/arcadiogarcia/zRover/releases).
 

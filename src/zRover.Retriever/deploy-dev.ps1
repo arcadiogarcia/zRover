@@ -7,7 +7,7 @@
 #   .\deploy-dev.ps1 -Arch arm64
 #   .\deploy-dev.ps1 -Config Release
 #
-# Usage (CI / GitHub Actions — skips trust UAC and Add-AppxPackage):
+# Usage (CI / GitHub Actions — skips trust UAC and Add-AppxProvisionedPackage):
 #   .\deploy-dev.ps1 -Config Release -SkipInstall
 #   Set env var SIGNING_CERT_THUMBPRINT if cert is already imported by CI.
 
@@ -16,7 +16,7 @@ param(
     [string] $Arch        = 'x64',
     [ValidateSet('Debug','Release')]
     [string] $Config      = 'Debug',
-    [switch] $SkipInstall           # CI: skip UAC trust + Add-AppxPackage
+    [switch] $SkipInstall           # CI: skip UAC trust + provisioning
 )
 
 $ErrorActionPreference = 'Stop'
@@ -241,19 +241,25 @@ if (-not $trusted) {
 }
 
 # ── 11. Remove any previously installed version ───────────────────────────────
-$existing = Get-AppxPackage | Where-Object { $_.Name -eq 'zRover.Retriever' }
+Get-AppxProvisionedPackage -Online |
+    Where-Object { $_.DisplayName -eq 'zRover.Retriever' } |
+    ForEach-Object {
+        Write-Host "Removing provisioned: $($_.PackageName)"
+        Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName
+    }
+$existing = Get-AppxPackage -AllUsers | Where-Object { $_.Name -eq 'zRover.Retriever' }
 if ($existing) {
     Write-Host "Removing previous: $($existing.PackageFullName)"
-    Remove-AppxPackage $existing.PackageFullName
+    Remove-AppxPackage $existing.PackageFullName -AllUsers
 }
 
-# ── 12. Install ───────────────────────────────────────────────────────────────
-Write-Host "Installing $MsixPath ..."
-Add-AppxPackage $MsixPath
+# ── 12. Install (all users) ──────────────────────────────────────────────────
+Write-Host "Installing $MsixPath (all users)..."
+Add-AppxProvisionedPackage -Online -PackagePath $MsixPath -SkipLicense
 
 Write-Host ''
-Write-Host 'Done. Package installed:'
-Get-AppxPackage | Where-Object { $_.Name -eq 'zRover.Retriever' } |
+Write-Host 'Done. Package provisioned for all users:'
+Get-AppxPackage -AllUsers | Where-Object { $_.Name -eq 'zRover.Retriever' } |
     Select-Object Name, Version, PackageFullName | Format-List
 
 Write-Host 'Startup task will appear in Task Manager > Startup apps after next login.'

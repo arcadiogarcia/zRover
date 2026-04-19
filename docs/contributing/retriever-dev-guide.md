@@ -92,7 +92,7 @@ cd src\zRover.Retriever
 | **7. Generate `.appinstaller`** | XML pointing at the GitHub Releases download URLs |
 | **8. Trust cert** | First run only: UAC prompt to add cert to `LocalMachine\TrustedPeople` (skipped with `-SkipInstall`) |
 | **9. Uninstall previous** | `Remove-AppxPackage` if an older version exists (skipped with `-SkipInstall`) |
-| **10. Install** | `Add-AppxPackage <path>` (skipped with `-SkipInstall`) |
+| **10. Install** | `Add-AppxProvisionedPackage -Online` — provisions for all users (skipped with `-SkipInstall`) |
 
 The dev cert state file at `%LOCALAPPDATA%\zRover.Retriever\dev-cert.json` is shared with `DevCertManager.cs` at runtime (for auto-signing packages before installation via MCP tools), so the two stay in sync automatically.
 
