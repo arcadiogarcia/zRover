@@ -51,10 +51,10 @@ jobs:
         run: msbuild src/zRover.Uwp/zRover.Uwp.csproj /p:Configuration=Release /p:Platform=AnyCPU /t:Build /v:minimal
 
       - name: Publish FullTrust (win-x64)
-        run: dotnet publish src/zRover.FullTrust.McpServer/zRover.FullTrust.McpServer.csproj -c Release -r win-x64 --no-self-contained -o src/zRover.FullTrust.McpServer/bin/publish-fdd-x64
+        run: dotnet publish src/zRover.FullTrust.McpServer/zRover.FullTrust.McpServer.csproj -c Release -r win-x64 -o src/zRover.FullTrust.McpServer/bin/publish-sc-x64
 
       - name: Publish FullTrust (win-arm64)
-        run: dotnet publish src/zRover.FullTrust.McpServer/zRover.FullTrust.McpServer.csproj -c Release -r win-arm64 --no-self-contained -o src/zRover.FullTrust.McpServer/bin/publish-fdd-arm64
+        run: dotnet publish src/zRover.FullTrust.McpServer/zRover.FullTrust.McpServer.csproj -c Release -r win-arm64 -o src/zRover.FullTrust.McpServer/bin/publish-sc-arm64
 
       - name: Pack NuGet package
         working-directory: src/zRover.Uwp/build

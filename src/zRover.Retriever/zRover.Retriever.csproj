@@ -8,7 +8,10 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <SelfContained>false</SelfContained>
+    <!-- Self-contained by default (no .NET runtime prompt on fresh devices).
+         Set StorePublish=true to use framework-dependent for Microsoft Store builds. -->
+    <SelfContained Condition="'$(StorePublish)' != 'true'">true</SelfContained>
+    <SelfContained Condition="'$(StorePublish)' == 'true'">false</SelfContained>
     <UseWindowsForms>false</UseWindowsForms>
     <UseWPF>false</UseWPF>
     <UseWinUI>true</UseWinUI>

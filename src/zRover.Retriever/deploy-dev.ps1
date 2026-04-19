@@ -53,7 +53,7 @@ if (Test-Path $oldAppInstaller) { Remove-Item $oldAppInstaller -Force; Write-Hos
 
 # ── 2. Publish binary layout ──────────────────────────────────────────────────
 Write-Host "Publishing ($Config|$Arch)..."
-dotnet publish $ProjectFile -c $Config -r $Rid --no-self-contained
+dotnet publish $ProjectFile -c $Config -r $Rid
 if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed' }
 
 # WinAppSDK assembles the layout into bin\Deploy\<Config>-<Arch> when the Deploy

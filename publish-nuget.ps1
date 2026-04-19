@@ -66,7 +66,7 @@ $ftDir = Join-Path $srcDir 'zRover.FullTrust.McpServer'
 foreach ($rid in @('win-x64', 'win-arm64')) {
     Write-Host "`n--- Publishing FullTrust ($rid) ---"
     Push-Location $ftDir
-    dotnet publish -c Release -r $rid --no-self-contained -o "bin\publish-fdd-$($rid -replace 'win-','')"
+    dotnet publish -c Release -r $rid -o "bin\publish-sc-$($rid -replace 'win-','')"
     if ($LASTEXITCODE -ne 0) { Pop-Location; throw "FullTrust publish ($rid) failed" }
     Pop-Location
 }

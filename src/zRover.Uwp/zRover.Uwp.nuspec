@@ -31,9 +31,9 @@ Minimal integration: three lines in App.xaml.cs.</description>
     <!-- MSBuild auto-import targets -->
     <file src="build\uap10.0\zRover.Uwp.targets" target="build\uap10.0\" />
     <!-- FullTrust companion server: win-x64 -->
-    <file src="..\zRover.FullTrust.McpServer\bin\publish-fdd-x64\**\*" target="tools\fulltrust\win-x64\" />
+    <file src="..\zRover.FullTrust.McpServer\bin\publish-sc-x64\**\*" target="tools\fulltrust\win-x64\" />
     <!-- FullTrust companion server: win-arm64 -->
-    <file src="..\zRover.FullTrust.McpServer\bin\publish-fdd-arm64\**\*" target="tools\fulltrust\win-arm64\" />
+    <file src="..\zRover.FullTrust.McpServer\bin\publish-sc-arm64\**\*" target="tools\fulltrust\win-arm64\" />
     <!-- Package README -->
     <file src="..\..\README.md" target="docs\" />
   </files>

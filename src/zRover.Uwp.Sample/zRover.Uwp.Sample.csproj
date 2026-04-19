@@ -240,7 +240,7 @@
       * Inject into AppxPackagePayload for .msix packaging.
   -->
   <Target Name="_BuildFullTrustProject" BeforeTargets="PrepareForBuild" Condition="'$(BuildingInsideVisualStudio)' != 'true' and '$(BuildingSolutionFile)' != 'true' and ('$(SolutionDir)' == '' or '$(SolutionDir)' == '*Undefined*')">
-    <Exec Command="dotnet build &quot;$(MSBuildThisFileDirectory)..\zRover.FullTrust.McpServer\zRover.FullTrust.McpServer.csproj&quot; -c $(Configuration) -r $(_FullTrustRid) --no-self-contained" />
+    <Exec Command="dotnet build &quot;$(MSBuildThisFileDirectory)..\zRover.FullTrust.McpServer\zRover.FullTrust.McpServer.csproj&quot; -c $(Configuration) -r $(_FullTrustRid)" />
   </Target>
   <!-- Copy FullTrust output into the AppX loose layout so F5 debugging works. -->
   <Target Name="_CopyFullTrustToLayout" AfterTargets="Build" DependsOnTargets="_BuildFullTrustProject" Condition="Exists('$(OutDir)AppX\AppxManifest.xml')">
