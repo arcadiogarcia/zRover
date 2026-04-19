@@ -1,15 +1,18 @@
 # zRover Integration Guide
 
-Add AI-driven UI automation to any UWP app. zRover exposes your app's screen and input as [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) tools, letting AI agents, test harnesses, and other MCP clients capture screenshots, inject touch/mouse/keyboard/pen/gamepad input, and validate coordinates — all over a standard HTTP endpoint.
+Add AI-driven UI automation to any **UWP** or **WinUI 3** app. zRover exposes your app's screen and input as [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) tools, letting AI agents, test harnesses, and other MCP clients capture screenshots, inject touch/mouse/keyboard/pen/gamepad input, and validate coordinates — all over a standard HTTP endpoint.
 
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)
-- [Install the NuGet Package](#install-the-nuget-package)
-- [Integration Steps](#integration-steps)
-  - [1. Add the Package Reference](#1-add-the-package-reference)
-  - [2. Update Package.appxmanifest](#2-update-packageappxmanifest)
-  - [3. Wire Up App.xaml.cs](#3-wire-up-appxamlcs)
+- [Choose Your Package](#choose-your-package)
+- [UWP Integration](#uwp-integration)
+  - [1. Add the Package Reference (UWP)](#1-add-the-package-reference-uwp)
+  - [2. Update Package.appxmanifest (UWP)](#2-update-packageappxmanifest-uwp)
+  - [3. Wire Up App.xaml.cs (UWP)](#3-wire-up-appxamlcs-uwp)
+- [WinUI 3 Integration](#winui-3-integration)
+  - [1. Add the Package Reference (WinUI)](#1-add-the-package-reference-winui)
+  - [2. Wire Up App.xaml.cs (WinUI)](#2-wire-up-appxamlcs-winui)
 - [Configuration](#configuration)
 - [Connecting MCP Clients](#connecting-mcp-clients)
   - [VS Code / GitHub Copilot](#vs-code--github-copilot)
@@ -42,13 +45,27 @@ Add AI-driven UI automation to any UWP app. zRover exposes your app's screen and
 - **Windows 10** (version 1904 / build 19041) or later
 - **.NET 8 runtime** installed on the target machine
 - **Developer Mode** enabled: Settings → Privacy & Security → For Developers
-- A UWP app targeting **UAP 10.0.19041** or higher
+- **UWP apps:** a UWP project targeting **UAP 10.0.19041** or higher
+- **WinUI 3 apps:** a WinUI 3 (Windows App SDK) project targeting **.NET 8+** with `net8.0-windows10.0.19041.0` or higher
 
-## Install the NuGet Package
+## Choose Your Package
 
-> **Debug builds only.** zRover is a development and testing tool — it exposes your app's screen and input over a local HTTP endpoint. **Never include zRover in release or production builds.** Exclude it from your release configuration (see [Add the Package Reference](#1-add-the-package-reference)).
+zRover ships two NuGet packages — pick the one that matches your UI framework:
+
+| Package | Framework | Architecture |
+|---|---|---|
+| `zRover.Uwp` | UWP (Universal Windows Platform) | Launches a FullTrust companion process for the MCP server. Requires manifest extensions and 3 touch-points in `App.xaml.cs`. |
+| `zRover.WinUI` | WinUI 3 (Windows App SDK) | Runs the MCP server **in-process** — no companion process needed. Only 2 touch-points in `App.xaml.cs`. |
+
+> **Debug builds only.** zRover is a development and testing tool — it exposes your app's screen and input over a local HTTP endpoint. **Never include zRover in release or production builds.** Exclude it from your release configuration (see the package reference sections below).
 >
 > By default the endpoint requires no authentication. You can enable Bearer token auth by passing `requireAuthToken: true` and an `authToken` value to `DebugHost.Start()` (or setting the equivalent properties on `DebugHostOptions`), and then configuring the same token in your MCP client.
+
+---
+
+## UWP Integration
+
+### Install the NuGet Package (UWP)
 
 ```
 dotnet add package zRover.Uwp --prerelease
@@ -67,9 +84,9 @@ The package includes:
 - **FullTrust companion server** — a .NET 8 MCP HTTP server (included for both x64 and ARM64)
 - **MSBuild targets** — automatically adds the FullTrust binaries to your AppX package and references the Desktop Extensions SDK
 
-## Integration Steps
+### Integration Steps (UWP)
 
-### 1. Add the Package Reference
+#### 1. Add the Package Reference (UWP)
 
 Add the `zRover.Uwp` NuGet package to your UWP app project **for debug configurations only**. The simplest way is to wrap the reference in a condition so it is excluded from release builds:
 
@@ -84,7 +101,7 @@ The package's MSBuild auto-import handles:
 - Referencing the **Windows Desktop Extensions SDK** (needed for `FullTrustProcessLauncher`)
 - Including the FullTrust companion server binaries in your AppX under `FullTrust\`
 
-### 2. Update Package.appxmanifest
+#### 2. Update Package.appxmanifest (UWP)
 
 Open your `Package.appxmanifest` and add the required namespaces, extensions, and capabilities.
 
@@ -132,7 +149,7 @@ Open your `Package.appxmanifest` and add the required namespaces, extensions, an
 
 > **Note:** The `inputInjectionBrokered` restricted capability enables input injection. Without it, input tools will fall back to XAML automation (which supports a subset of interactions). The `runFullTrust` capability is required to launch the companion MCP server.
 
-### 3. Wire Up App.xaml.cs
+#### 3. Wire Up App.xaml.cs (UWP)
 
 zRover requires exactly **three touch-points** in your `App.xaml.cs`:
 
@@ -196,16 +213,97 @@ sealed partial class App : Application
 
 That's it. Build and run your app — the MCP server will start listening on `http://localhost:5100/mcp`.
 
+---
+
+## WinUI 3 Integration
+
+WinUI 3 (Windows App SDK) apps run as full-trust desktop processes, so zRover runs the MCP server **in-process** — no FullTrust companion or special manifest extensions are needed.
+
+### Install the NuGet Package (WinUI)
+
+```
+dotnet add package zRover.WinUI --prerelease
+```
+
+Or add to your `.csproj`:
+
+```xml
+<PackageReference Include="zRover.WinUI" />
+```
+
+The package includes:
+- **zRover.WinUI.dll** — the WinUI 3 library with in-process MCP server
+- **zRover.Core.dll** and **zRover.Mcp.dll** — bundled automatically
+
+### 1. Add the Package Reference (WinUI)
+
+Wrap the reference in a condition so it is excluded from release builds:
+
+```xml
+<PackageReference Include="zRover.WinUI" Condition="'$(Configuration)' == 'Debug'" />
+```
+
+No manifest changes or additional capabilities are required — WinUI 3 apps already have full-trust access.
+
+### 2. Wire Up App.xaml.cs (WinUI)
+
+zRover requires only **two touch-points** in your `App.xaml.cs`:
+
+```csharp
+using Microsoft.UI.Xaml;
+
+sealed partial class App : Application
+{
+    private Window? m_window;
+
+    public App()
+    {
+        this.InitializeComponent();
+    }
+
+    protected override async void OnLaunched(LaunchActivatedEventArgs args)
+    {
+        m_window = new MainWindow();
+        m_window.Activate();
+
+#if DEBUG
+        // --- zRover: Start the in-process MCP server ---
+        await zRover.WinUI.RoverMcp.StartAsync(m_window, "MyApp");
+
+        // --- zRover: Clean shutdown on window close ---
+        m_window.Closed += async (s, e) => await zRover.WinUI.RoverMcp.StopAsync();
+#endif
+    }
+}
+```
+
+That's it — no `OnBackgroundActivated` override, no `Package.appxmanifest` changes. Build and run your app — the MCP server will start listening on `http://localhost:5100/mcp`.
+
 ## Configuration
 
-`RoverMcp.StartAsync` accepts the following parameters:
+### UWP — `RoverMcp.StartAsync` Parameters
+
+`zRover.Uwp.RoverMcp.StartAsync` accepts the following parameters:
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `appName` | `string` | *(required)* | Display name shown to MCP clients |
-| `port` | `int` | `5100` | TCP port the MCP server listens on |
+| `port` | `int` | `5100` | TCP port the MCP server listens on. Pass `0` to let the OS pick a free port. |
 | `launchFullTrust` | `Func<Task>?` | `null` | Callback to launch the FullTrust companion. Pass the `FullTrustProcessLauncher` call as shown above. If `null`, no companion server starts (tools register but aren't reachable externally). |
 | `actionableApp` | `IActionableApp?` | `null` | Optional implementation of `zRover.Core.IActionableApp` to expose app-defined actions via the `list_actions` and `dispatch_action` MCP tools. See [App Action Tools](#app-action-tools). |
+| `managerUrl` | `string?` | `null` | URL of the zRover Retriever for session registration (e.g. `http://localhost:5200`). |
+
+### WinUI 3 — `RoverMcp.StartAsync` Parameters
+
+`zRover.WinUI.RoverMcp.StartAsync` accepts the following parameters:
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `window` | `Window` | *(required)* | The main application window. Required for UI thread access and screenshots. |
+| `appName` | `string` | *(required)* | Display name shown to MCP clients |
+| `port` | `int` | `5100` | TCP port the MCP server listens on. Pass `0` to let the OS pick a free port. |
+| `actionableApp` | `IActionableApp?` | `null` | Optional implementation of `zRover.Core.IActionableApp` to expose app-defined actions via the `list_actions` and `dispatch_action` MCP tools. See [App Action Tools](#app-action-tools). |
+| `managerUrl` | `string?` | `null` | URL of the zRover Retriever for session registration (e.g. `http://localhost:5200`). |
 
 ## Connecting MCP Clients
 
@@ -646,6 +744,7 @@ public sealed partial class MainPage : Page, IActionableApp
 
 Pass the instance to `RoverMcp.StartAsync` in `App.xaml.cs`:
 
+**UWP:**
 ```csharp
 protected override async void OnLaunched(LaunchActivatedEventArgs e)
 {
@@ -659,7 +758,24 @@ protected override async void OnLaunched(LaunchActivatedEventArgs e)
 }
 ```
 
-> **Thread safety:** `GetAvailableActions()` is called from the AppService IPC thread (background). `DispatchAsync` receives the call on a background thread — marshal any UI work to `Dispatcher.RunAsync` as shown above.
+**WinUI 3:**
+```csharp
+protected override async void OnLaunched(LaunchActivatedEventArgs args)
+{
+    m_window = new MainWindow();
+    m_window.Activate();
+
+#if DEBUG
+    var mainPage = (m_window as MainWindow)?.MainPage;
+    var actionableApp = mainPage as zRover.Core.IActionableApp;
+    await zRover.WinUI.RoverMcp.StartAsync(m_window, "MyApp",
+        actionableApp: actionableApp);
+    m_window.Closed += async (s, e) => await zRover.WinUI.RoverMcp.StopAsync();
+#endif
+}
+```
+
+> **Thread safety:** `GetAvailableActions()` is called from a background thread. `DispatchAsync` also receives the call on a background thread — marshal any UI work to the dispatcher. In UWP use `Dispatcher.RunAsync`; in WinUI 3 use `DispatcherQueue.TryEnqueue`.
 
 ---
 
@@ -886,11 +1002,12 @@ Set `dryRun: true` on any input tool to get the preview without actually injecti
 ## Requirements & Limitations
 
 - **Developer Mode** must be enabled on the machine for input injection to work.
-- **Input injection** requires the `inputInjectionBrokered` restricted capability. Without it, touch, pen, gamepad, and multi-touch injection will not work.
+- **Input injection** requires the `inputInjectionBrokered` restricted capability (UWP) or Developer Mode (WinUI 3). Without it, touch, pen, gamepad, and multi-touch injection will not work.
 - **Architecture must match the host machine.** The `InputInjector` COM component is native-only — it does not work under emulation. On ARM64 machines, you **must** set your Solution Platform to **ARM64** in Configuration Manager. Both **AnyCPU** and **x64** produce packages that Windows runs under x64 emulation on ARM64, causing `InputInjector.TryCreate()` to fail with `HRESULT 0x800700C1` ("is not a valid Win32 application"). When InputInjector is unavailable, tap and drag tools fall back to Win32 `SendInput` (mouse-only, no touch/pen/gamepad). See [Troubleshooting](#troubleshooting) for details.
-- The MCP server runs as a **FullTrust companion process** alongside your UWP app. Both processes must be running for tools to work.
+- **UWP:** The MCP server runs as a **FullTrust companion process** alongside your UWP app. Both processes must be running for tools to work.
+- **WinUI 3:** The MCP server runs **in-process** — no companion process is needed.
 - The server listens on **localhost only** — remote connections require your own tunneling solution.
-- **.NET 8 runtime** must be installed on the target machine (the companion is published as framework-dependent).
+- **.NET 8 runtime** must be installed on the target machine (the UWP companion is published as framework-dependent; WinUI 3 apps bundle it based on your publish settings).
 - Screenshot tools operate on the XAML visual tree. Overlays or content rendered outside the XAML tree (e.g. DirectX swap chains) may not appear in captures.
 
 ## Troubleshooting
@@ -901,13 +1018,13 @@ Set `dryRun: true` on any input tool to get the preview without actually injecti
 - The FullTrust companion needs a moment to start after launch. Wait a few seconds after the app window appears.
 
 **Tools list is empty**
-- Ensure `RoverMcp.StartAsync` is called **after** `Window.Current.Activate()` in `OnLaunched`.
-- Verify `OnBackgroundActivated` calls `RoverMcp.HandleBackgroundActivation(args)`.
+- **UWP:** Ensure `RoverMcp.StartAsync` is called **after** `Window.Current.Activate()` in `OnLaunched`. Verify `OnBackgroundActivated` calls `RoverMcp.HandleBackgroundActivation(args)`.
+- **WinUI 3:** Ensure `RoverMcp.StartAsync` is called **after** `m_window.Activate()` in `OnLaunched`.
 
 **Input injection has no effect**
-- Confirm `inputInjectionBrokered` is declared in your manifest.
+- **UWP:** Confirm `inputInjectionBrokered` is declared in your manifest.
 - Ensure Developer Mode is enabled (required by `InputInjector`).
-- The app window must be in the foreground — the companion server automatically brings it forward before injection.
+- The app window must be in the foreground — the server automatically brings it forward before injection.
 
 **InputInjector fails on ARM64**
 - On ARM64 machines, the `InputInjector` COM interface is native ARM64 only. If your app is built as **x64** or **AnyCPU**, Windows runs the UWP process under x64 emulation, and `InputInjector.TryCreate()` fails.

@@ -100,9 +100,12 @@ public class Program
             options.ServerInfo = new Implementation { Name = "zRover.Manager", Version = "1.0.0" };
             options.Capabilities = new ServerCapabilities
             {
-                Tools = new ToolsCapability { ListChanged = true }
+                Tools = new ToolsCapability { ListChanged = true },
+                Resources = new ResourcesCapability { }
             };
-        }).WithHttpTransport();
+        })
+        .WithHttpTransport()
+        .WithResources<zRover.Retriever.Server.IntegrationGuideResource>();
 
         var webApp = builder.Build();
 
