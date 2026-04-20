@@ -34,6 +34,8 @@ public sealed partial class MainWindow : Window
         var v = Windows.ApplicationModel.Package.Current.Id.Version;
         AppVersionText.Text = $"v{v.Major}.{v.Minor}.{v.Build}.{v.Revision}";
 
+        LocalDeviceInfoText.Text = BuildLocalDeviceInfo();
+
         var services = App.Services!;
         _registry = services.GetRequiredService<SessionRegistry>();
         _managers = services.GetRequiredService<RemoteManagerRegistry>();
@@ -155,6 +157,25 @@ public sealed partial class MainWindow : Window
         ControllersList.ItemsSource = controllerItems;
         ControllersList.Visibility = controllerItems.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         NoControllersText.Visibility = controllerItems.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// Builds the one-line description of the local device shown under the title bar,
+    /// e.g. "MY-PC \u2022 x64 \u2022 Microsoft Windows 10.0.26100".
+    /// </summary>
+    private static string BuildLocalDeviceInfo()
+    {
+        var name = Environment.MachineName;
+        var arch = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture switch
+        {
+            System.Runtime.InteropServices.Architecture.X64   => "x64",
+            System.Runtime.InteropServices.Architecture.Arm64 => "arm64",
+            System.Runtime.InteropServices.Architecture.X86   => "x86",
+            System.Runtime.InteropServices.Architecture.Arm   => "arm",
+            var other                                          => other.ToString().ToLowerInvariant(),
+        };
+        var os = System.Runtime.InteropServices.RuntimeInformation.OSDescription;
+        return $"{name} \u2022 {arch} \u2022 {os}";
     }
 
     private void RefreshPackageInstallState()

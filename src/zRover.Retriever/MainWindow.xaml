@@ -11,15 +11,21 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-            <TextBlock Text="zRover Retriever"
-                       Style="{StaticResource TitleTextBlockStyle}"/>
-            <TextBlock x:Name="AppVersionText"
+        <StackPanel Grid.Row="0" Spacing="2">
+            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                <TextBlock Text="zRover Retriever"
+                           Style="{StaticResource TitleTextBlockStyle}"/>
+                <TextBlock x:Name="AppVersionText"
+                           Text=""
+                           Style="{StaticResource SubtitleTextBlockStyle}"
+                           Opacity="0.5"
+                           VerticalAlignment="Bottom"
+                           Margin="0,0,0,3"/>
+            </StackPanel>
+            <TextBlock x:Name="LocalDeviceInfoText"
                        Text=""
-                       Style="{StaticResource SubtitleTextBlockStyle}"
-                       Opacity="0.5"
-                       VerticalAlignment="Bottom"
-                       Margin="0,0,0,3"/>
+                       Opacity="0.6"
+                       FontSize="12"/>
         </StackPanel>
 
         <!-- Two-column body -->
