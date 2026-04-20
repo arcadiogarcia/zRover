@@ -167,8 +167,11 @@ public sealed class ExternalAccessManager : IDisposable
             }
 
             var remoteIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            var key = extControllers.Track(remoteIp);
-            context.RequestAborted.Register(() => extControllers.Untrack(key));
+            var userAgent = context.Request.Headers.UserAgent.ToString();
+            var sessionId = context.Request.Headers["Mcp-Session-Id"].ToString();
+            var key = extControllers.Track(remoteIp,
+                string.IsNullOrEmpty(userAgent) ? null : userAgent,
+                string.IsNullOrEmpty(sessionId) ? null : sessionId);
             try
             {
                 await next();

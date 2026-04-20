@@ -248,8 +248,11 @@ public class Program
             }
 
             var remoteIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            var key = controllerRegistry.Track(remoteIp);
-            context.RequestAborted.Register(() => controllerRegistry.Untrack(key));
+            var userAgent = context.Request.Headers.UserAgent.ToString();
+            var sessionId = context.Request.Headers["Mcp-Session-Id"].ToString();
+            var key = controllerRegistry.Track(remoteIp,
+                string.IsNullOrEmpty(userAgent) ? null : userAgent,
+                string.IsNullOrEmpty(sessionId) ? null : sessionId);
             try
             {
                 await next();

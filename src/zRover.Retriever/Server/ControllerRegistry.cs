@@ -3,53 +3,78 @@ using System.Collections.Concurrent;
 namespace zRover.Retriever.Server;
 
 /// <summary>
-/// Tracks inbound MCP client connections — remote Retrievers that have connected
-/// to this instance to control it through federation.
-///
-/// Each active SSE stream to the <c>/mcp</c> endpoint is tracked as a "controller".
-/// Middleware registers the connection when the SSE response begins and unregisters
-/// it when the response completes (client disconnects).
+/// Tracks active inbound MCP client connections so they can be surfaced in the UI.
+/// Dedupes by the MCP session id (sent in the Mcp-Session-Id header by spec-compliant
+/// clients) so a single client appears as one entry regardless of how many concurrent
+/// HTTP requests it has in flight. Falls back to a random per-request key when missing.
 /// </summary>
 public sealed class ControllerRegistry
 {
-    private readonly ConcurrentDictionary<string, ControllerInfo> _controllers = new();
+    private readonly ConcurrentDictionary<string, Entry> _controllers = new();
 
-    /// <summary>Fired when a controller connects or disconnects.</summary>
     public event EventHandler? ControllersChanged;
 
-    /// <summary>Snapshot of all currently connected controllers.</summary>
     public IReadOnlyList<ControllerInfo> Controllers =>
-        _controllers.Values.OrderBy(c => c.ConnectedSince).ToList();
+        _controllers.Values.Select(e => e.Info).OrderBy(c => c.ConnectedSince).ToList();
 
-    /// <summary>
-    /// Registers an active inbound MCP session.
-    /// Returns a key that must be passed to <see cref="Untrack"/> on disconnect.
-    /// </summary>
-    public string Track(string remoteAddress)
+    public string Track(string remoteAddress, string? userAgent, string? sessionId)
     {
-        var key = Guid.NewGuid().ToString("N")[..8];
-        _controllers[key] = new ControllerInfo
-        {
-            Key = key,
-            RemoteAddress = remoteAddress,
-            ConnectedSince = DateTimeOffset.UtcNow,
-        };
-        ControllersChanged?.Invoke(this, EventArgs.Empty);
+        var key = !string.IsNullOrEmpty(sessionId)
+            ? sessionId!
+            : Guid.NewGuid().ToString("N")[..8];
+
+        bool added = false;
+        _controllers.AddOrUpdate(key,
+            _ =>
+            {
+                added = true;
+                return new Entry
+                {
+                    Info = new ControllerInfo
+                    {
+                        Key = key,
+                        RemoteAddress = remoteAddress,
+                        UserAgent = userAgent,
+                        ConnectedSince = DateTimeOffset.UtcNow,
+                    },
+                    RefCount = 1,
+                };
+            },
+            (_, existing) =>
+            {
+                Interlocked.Increment(ref existing.RefCount);
+                if (string.IsNullOrEmpty(existing.Info.UserAgent) && !string.IsNullOrEmpty(userAgent))
+                    existing.Info = existing.Info with { UserAgent = userAgent };
+                return existing;
+            });
+
+        if (added)
+            ControllersChanged?.Invoke(this, EventArgs.Empty);
         return key;
     }
 
-    /// <summary>Removes a previously tracked controller session.</summary>
     public void Untrack(string key)
     {
-        if (_controllers.TryRemove(key, out _))
-            ControllersChanged?.Invoke(this, EventArgs.Empty);
+        if (!_controllers.TryGetValue(key, out var entry)) return;
+
+        if (Interlocked.Decrement(ref entry.RefCount) <= 0)
+        {
+            if (_controllers.TryRemove(key, out _))
+                ControllersChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private sealed class Entry
+    {
+        public ControllerInfo Info = null!;
+        public int RefCount;
     }
 }
 
-/// <summary>Read-only snapshot of a single inbound controller connection.</summary>
 public record ControllerInfo
 {
     public string Key { get; init; } = "";
     public string RemoteAddress { get; init; } = "";
+    public string? UserAgent { get; init; }
     public DateTimeOffset ConnectedSince { get; init; }
 }

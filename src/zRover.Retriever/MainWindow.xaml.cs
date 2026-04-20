@@ -150,8 +150,10 @@ public sealed partial class MainWindow : Window
     {
         var controllerItems = _controllers.Controllers.Select(c => new ControllerViewModel
         {
-            DisplayText = c.RemoteAddress,
-            DetailText = $"Connected since {c.ConnectedSince.LocalDateTime:g}",
+            DisplayText = string.IsNullOrWhiteSpace(c.UserAgent) ? c.RemoteAddress : c.UserAgent!,
+            DetailText = string.IsNullOrWhiteSpace(c.UserAgent)
+                ? $"Connected since {c.ConnectedSince.LocalDateTime:g}"
+                : $"{c.RemoteAddress} \u2014 connected since {c.ConnectedSince.LocalDateTime:g}",
         }).ToList();
 
         ControllersList.ItemsSource = controllerItems;

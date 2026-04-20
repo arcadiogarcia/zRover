@@ -77,9 +77,9 @@
                                Opacity="0.5" FontSize="12"/>
                 </StackPanel>
 
-                <!-- Controlling Remote Retrievers (inbound: they control this instance) -->
+                <!-- Connected MCP clients (any inbound MCP connection) -->
                 <StackPanel Spacing="8">
-                    <TextBlock Text="Controlling Remote Retrievers" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                    <TextBlock Text="Connected MCP Clients" Style="{StaticResource SubtitleTextBlockStyle}"/>
                     <ListView x:Name="ControllersList" MaxHeight="120">
                         <ListView.ItemTemplate>
                             <DataTemplate>
@@ -99,7 +99,7 @@
                         </ListView.ItemTemplate>
                     </ListView>
                     <TextBlock x:Name="NoControllersText"
-                               Text="No remote retrievers controlling this instance"
+                               Text="No connected MCP clients"
                                Opacity="0.5" FontSize="12"/>
                 </StackPanel>
 
