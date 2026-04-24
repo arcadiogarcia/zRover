@@ -233,6 +233,10 @@ namespace zRover.Uwp
         {
             Tools[name] = new SimpleToolEntry { Description = description, InputSchema = inputSchema, Handler = handler };
         }
+
+        public bool TryUnregisterTool(string name) => Tools.Remove(name);
+
+        public bool IsToolRegistered(string name) => Tools.ContainsKey(name);
     }
 
     internal class SimpleToolEntry

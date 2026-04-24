@@ -13,7 +13,7 @@
     <NoWarn>$(NoWarn);MCPEXP001</NoWarn>
     <!-- NuGet package metadata -->
     <PackageId>zRover.WinUI</PackageId>
-    <Version>0.1.4-preview</Version>
+    <Version>0.1.5-preview</Version>
     <Authors>zRover Contributors</Authors>
     <Description>Add Model Context Protocol (MCP) tool endpoints to any WinUI 3 app. zRover exposes input injection, screenshot capture, coordinate validation, and app-defined action dispatch as MCP tools through an in-process HTTP server — no FullTrust companion process needed. WinUI 3 apps run full-trust, so the MCP server starts directly in-process.
 

@@ -14,10 +14,29 @@ namespace zRover.Mcp
     /// and converts them into <see cref="McpServerTool"/> entries for use with the
     /// official MCP C# SDK.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The underlying <see cref="McpServerPrimitiveCollection{T}"/> raises
+    /// <c>Changed</c> automatically on every <c>Add</c>/<c>Remove</c>/<c>Clear</c>,
+    /// which the SDK translates into a <c>notifications/tools/list_changed</c>
+    /// notification on connected sessions whose transport supports unsolicited
+    /// notifications (i.e. stateful HTTP and stdio).
+    /// </para>
+    /// <para>
+    /// To remove a tool (for example when a session disconnects) call
+    /// <see cref="TryUnregisterTool"/>. To force a notification when the catalog
+    /// shape is unchanged but tool behaviour has materially changed underneath
+    /// (e.g. the active session rotated and proxy tools now target a different
+    /// app), call <see cref="NotifyToolsChanged"/>. Routine add/remove operations
+    /// already raise the event automatically — no caller-side notification is
+    /// required.
+    /// </para>
+    /// </remarks>
     public sealed class McpToolRegistryAdapter : IMcpToolRegistry
     {
-        private readonly McpServerPrimitiveCollection<McpServerTool> _tools = new McpServerPrimitiveCollection<McpServerTool>();
-        private readonly HashSet<string> _registeredNames = new HashSet<string>(StringComparer.Ordinal);
+        private readonly NotifyingToolCollection _tools = new NotifyingToolCollection();
+        private readonly Dictionary<string, McpServerTool> _toolsByName = new(StringComparer.Ordinal);
+        private readonly object _gate = new object();
 
         public McpServerPrimitiveCollection<McpServerTool> Tools => _tools;
 
@@ -27,8 +46,7 @@ namespace zRover.Mcp
             string inputSchema,
             Func<string, Task<string>> handler)
         {
-            _tools.Add(new DelegateMcpServerTool(name, description, inputSchema, handler));
-            _registeredNames.Add(name);
+            AddInternal(new DelegateMcpServerTool(name, description, inputSchema, handler));
         }
 
         public void RegisterTool(
@@ -37,33 +55,75 @@ namespace zRover.Mcp
             string inputSchema,
             Func<string, Task<RoverToolResult>> handler)
         {
-            _tools.Add(new RichDelegateMcpServerTool(name, description, inputSchema, handler));
-            _registeredNames.Add(name);
+            AddInternal(new RichDelegateMcpServerTool(name, description, inputSchema, handler));
         }
 
-        /// <summary>
-        /// Forces the MCP server to send a <c>tools/list_changed</c> notification to
-        /// all connected clients. Used to signal session list changes so remote managers
-        /// can re-sync their propagated sessions.
-        /// </summary>
-        public void NotifyToolsChanged()
+        private void AddInternal(McpServerTool tool)
         {
-            // The McpServerPrimitiveCollection fires CollectionChanged, which the
-            // MCP SDK translates into a tools/list_changed notification. We trigger
-            // this by adding and immediately removing a sentinel tool.
-            var sentinel = new DelegateMcpServerTool(
-                "__notify_sentinel__", "", """{"type":"object","properties":{}}""",
-                _ => Task.FromResult("{}"));
-            _tools.Add(sentinel);
-            _tools.Remove(sentinel);
+            lock (_gate)
+            {
+                if (_toolsByName.ContainsKey(tool.ProtocolTool.Name))
+                    throw new InvalidOperationException(
+                        $"A tool named '{tool.ProtocolTool.Name}' is already registered.");
+
+                _toolsByName.Add(tool.ProtocolTool.Name, tool);
+            }
+
+            // Add outside the lock — the underlying collection is itself
+            // thread-safe and may invoke Changed handlers synchronously, which
+            // could otherwise deadlock against callers that hold _gate.
+            _tools.Add(tool);
         }
 
         /// <summary>
-        /// Returns <c>true</c> when a tool with the given name is already registered.
-        /// Used by <see cref="ActiveSessionProxy"/> to avoid double-registering tools
-        /// that are already present from the device management layer.
+        /// Removes a previously registered tool. Returns <c>true</c> if a tool
+        /// with that name was found and removed, otherwise <c>false</c>. The
+        /// underlying collection raises a <c>tools/list_changed</c> notification
+        /// automatically when removal succeeds.
         /// </summary>
-        public bool IsToolRegistered(string name) => _registeredNames.Contains(name);
+        public bool TryUnregisterTool(string name)
+        {
+            McpServerTool? tool;
+            lock (_gate)
+            {
+                if (!_toolsByName.TryGetValue(name, out tool))
+                    return false;
+                _toolsByName.Remove(name);
+            }
+
+            return _tools.Remove(tool);
+        }
+
+        /// <summary>
+        /// Forces an unsolicited <c>tools/list_changed</c> notification to all
+        /// connected clients without mutating the catalog. Use this only when the
+        /// shape of the tool list is identical but the behaviour behind one or
+        /// more tools has materially changed (for example, the active session
+        /// rotated, so the targets of the proxy tools have changed).
+        /// </summary>
+        public void NotifyToolsChanged() => _tools.RaiseChangedExternal();
+
+        /// <summary>
+        /// Returns <c>true</c> when a tool with the given name is already
+        /// registered.
+        /// </summary>
+        public bool IsToolRegistered(string name)
+        {
+            lock (_gate)
+                return _toolsByName.ContainsKey(name);
+        }
+
+        /// <summary>
+        /// <see cref="McpServerPrimitiveCollection{T}"/> subclass that exposes the
+        /// otherwise-protected <see cref="McpServerPrimitiveCollection{T}.RaiseChanged"/>
+        /// method. The SDK subscribes to <c>Changed</c> on this collection when
+        /// the server starts and emits the MCP <c>tools/list_changed</c>
+        /// notification in response.
+        /// </summary>
+        private sealed class NotifyingToolCollection : McpServerPrimitiveCollection<McpServerTool>
+        {
+            internal void RaiseChangedExternal() => RaiseChanged();
+        }
     }
 
     /// <summary>

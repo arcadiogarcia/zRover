@@ -253,6 +253,7 @@ public class Program
             var key = controllerRegistry.Track(remoteIp,
                 string.IsNullOrEmpty(userAgent) ? null : userAgent,
                 string.IsNullOrEmpty(sessionId) ? null : sessionId);
+            context.RequestAborted.Register(() => controllerRegistry.Untrack(key));
             try
             {
                 await next();
@@ -268,11 +269,13 @@ public class Program
         // ── Package staging upload endpoint ───────────────────────────────────────
         PackageStagingEndpoint.MapStagingEndpoints(webApp, stagingManager);
 
-        // ── Fire tools/list_changed when sessions change (enables real-time sync) ──
-        // Only notify when proxy tools are already initialised. If they aren't, the
-        // OnSessionRegisteredAsync path will send the authoritative notification once
-        // tool registration completes, avoiding a race where clients re-fetch the list
-        // before interaction tools (capture_view, inject_tap, …) are registered.
+        // ── Fire tools/list_changed when sessions change ──────────────────────────
+        // ActiveSessionProxy already emits notifications when tools are added /
+        // removed (per-session ref-counted) and when the active session
+        // rotates. The SessionsChanged event also fires for in-flight session
+        // additions where ActiveSessionProxy hasn't run yet (e.g. before the
+        // session has published its tool list); we re-emit a notification then
+        // so clients that surface a session list see it refresh promptly.
         var sessionRegistry = webApp.Services.GetRequiredService<SessionRegistry>();
         var toolAdapter = webApp.Services.GetRequiredService<McpToolRegistryAdapter>();
         var activeProxy = webApp.Services.GetRequiredService<ActiveSessionProxy>();

@@ -258,6 +258,74 @@ public class McpToolRegistryAdapterTests
         var adapter = new McpToolRegistryAdapter();
         adapter.Should().BeAssignableTo<IMcpToolRegistry>();
     }
+
+    [Fact]
+    public void RegisterTool_DuplicateName_Throws()
+    {
+        var adapter = new McpToolRegistryAdapter();
+        adapter.RegisterTool("dup", "x", """{"type":"object","properties":{}}""", _ => Task.FromResult("{}"));
+
+        var act = () => adapter.RegisterTool("dup", "y", """{"type":"object","properties":{}}""", _ => Task.FromResult("{}"));
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void TryUnregisterTool_RemovesAndReturnsTrue()
+    {
+        var adapter = new McpToolRegistryAdapter();
+        adapter.RegisterTool("removable", "x", """{"type":"object","properties":{}}""", _ => Task.FromResult("{}"));
+
+        adapter.TryUnregisterTool("removable").Should().BeTrue();
+        adapter.IsToolRegistered("removable").Should().BeFalse();
+        adapter.Tools.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TryUnregisterTool_UnknownName_ReturnsFalse()
+    {
+        var adapter = new McpToolRegistryAdapter();
+        adapter.TryUnregisterTool("never_registered").Should().BeFalse();
+    }
+
+    [Fact]
+    public void RegisterTool_FiresChangedEventOnUnderlyingCollection()
+    {
+        var adapter = new McpToolRegistryAdapter();
+        var fired = 0;
+        adapter.Tools.Changed += (_, _) => Interlocked.Increment(ref fired);
+
+        adapter.RegisterTool("a", "x", """{"type":"object","properties":{}}""", _ => Task.FromResult("{}"));
+        adapter.RegisterTool("b", "x", """{"type":"object","properties":{}}""", _ => Task.FromResult("{}"));
+
+        fired.Should().Be(2, "each Add fires Changed exactly once");
+    }
+
+    [Fact]
+    public void TryUnregisterTool_FiresChangedEvent()
+    {
+        var adapter = new McpToolRegistryAdapter();
+        adapter.RegisterTool("a", "x", """{"type":"object","properties":{}}""", _ => Task.FromResult("{}"));
+
+        var fired = 0;
+        adapter.Tools.Changed += (_, _) => Interlocked.Increment(ref fired);
+
+        adapter.TryUnregisterTool("a").Should().BeTrue();
+        fired.Should().Be(1);
+    }
+
+    [Fact]
+    public void NotifyToolsChanged_FiresChangedEventWithoutMutation()
+    {
+        var adapter = new McpToolRegistryAdapter();
+        adapter.RegisterTool("a", "x", """{"type":"object","properties":{}}""", _ => Task.FromResult("{}"));
+
+        var fired = 0;
+        adapter.Tools.Changed += (_, _) => Interlocked.Increment(ref fired);
+
+        adapter.NotifyToolsChanged();
+        fired.Should().Be(1);
+        adapter.Tools.Should().HaveCount(1, "NotifyToolsChanged must not mutate the catalog");
+    }
 }
 
 /// <summary>

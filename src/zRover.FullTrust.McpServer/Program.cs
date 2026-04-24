@@ -294,17 +294,7 @@ internal static class McpServerRunner
             builder.Services.AddSingleton<ModelContextProtocol.Server.McpServerTool>(tool);
         }
 
-        builder.Services.AddMcpServer(options =>
-        {
-            options.ServerInfo = new Implementation { Name = "zRover", Version = "1.0.0" };
-            options.Capabilities = new ServerCapabilities
-            {
-                Tools = new ToolsCapability { ListChanged = true }
-            };
-            // Supply the tool collection directly so both stdio and HTTP paths
-            // share the same tool source.
-            options.ToolCollection = adapter.Tools;
-        }).WithHttpTransport();
+        builder.Services.AddMcpServer(options => ApplyOptions(options, adapter)).WithHttpTransport();
 
         var app = builder.Build();
 
@@ -343,15 +333,27 @@ internal static class McpServerRunner
 
     private static McpServerOptions CreateOptions(McpToolRegistryAdapter adapter)
     {
-        return new McpServerOptions
+        var options = new McpServerOptions();
+        ApplyOptions(options, adapter);
+        return options;
+    }
+
+    /// <summary>
+    /// Single source of truth for <see cref="McpServerOptions"/> so that the
+    /// stdio and HTTP transports advertise identical capabilities and the same
+    /// tool collection. Both transports declare <c>tools.listChanged = true</c>;
+    /// the SDK will silently downgrade that to <c>null</c> if the underlying
+    /// transport is the stateless Streamable HTTP variant (which cannot send
+    /// unsolicited notifications), so the value is always safe to set.
+    /// </summary>
+    private static void ApplyOptions(McpServerOptions options, McpToolRegistryAdapter adapter)
+    {
+        options.ServerInfo = new Implementation { Name = "zRover", Version = "1.0.0" };
+        options.Capabilities = new ServerCapabilities
         {
-            ServerInfo = new Implementation { Name = "zRover", Version = "1.0.0" },
-            Capabilities = new ServerCapabilities
-            {
-                Tools = new ToolsCapability { ListChanged = true }
-            },
-            ToolCollection = adapter.Tools
+            Tools = new ToolsCapability { ListChanged = true }
         };
+        options.ToolCollection = adapter.Tools;
     }
 }
 
