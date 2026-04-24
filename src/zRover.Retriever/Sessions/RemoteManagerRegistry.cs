@@ -583,7 +583,9 @@ public sealed class RemoteManagerRegistry : IDisposable
 
     private static string GenerateManagerId()
     {
-        return Convert.ToHexString(RandomNumberGenerator.GetBytes(4)).ToLowerInvariant();
+        // 8 bytes = 64 bits of entropy. With UI-displayed manager rosters in
+        // the dozens, collision probability is effectively zero.
+        return Convert.ToHexString(RandomNumberGenerator.GetBytes(8)).ToLowerInvariant();
     }
 
     private static string ExtractHostname(string url)

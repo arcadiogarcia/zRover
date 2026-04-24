@@ -50,7 +50,13 @@ public sealed class RetrieverSettingsStore
         try
         {
             var json = JsonSerializer.Serialize(settings, JsonOptions);
-            File.WriteAllText(SettingsPath, json);
+
+            // Atomic write: serialize to a sibling temp file, fsync, then
+            // File.Move with overwrite. This prevents a half-written
+            // RetrieverSettings.json if the process crashes mid-write.
+            var tempPath = SettingsPath + ".tmp";
+            File.WriteAllText(tempPath, json);
+            File.Move(tempPath, SettingsPath, overwrite: true);
         }
         catch (Exception ex)
         {

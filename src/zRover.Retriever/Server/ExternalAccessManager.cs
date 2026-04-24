@@ -100,6 +100,7 @@ public sealed class ExternalAccessManager : IDisposable
             .GetRequiredService<McpToolRegistryAdapter>().Tools;
 
         var token = BearerToken; // capture for closure
+        var expectedAuth = System.Text.Encoding.UTF8.GetBytes($"Bearer {token}");
 
         // Bearer-token auth middleware for all requests.
         // /packages/stage/{token} paths are self-authenticating via their embedded
@@ -112,7 +113,11 @@ public sealed class ExternalAccessManager : IDisposable
                 return;
             }
             var auth = context.Request.Headers.Authorization.ToString();
-            if (string.IsNullOrEmpty(auth) || auth != $"Bearer {token}")
+            var authBytes = string.IsNullOrEmpty(auth)
+                ? Array.Empty<byte>()
+                : System.Text.Encoding.UTF8.GetBytes(auth);
+            if (authBytes.Length != expectedAuth.Length ||
+                !CryptographicOperations.FixedTimeEquals(authBytes, expectedAuth))
             {
                 context.Response.StatusCode = 401;
                 await context.Response.WriteAsync("Unauthorized");
@@ -242,7 +247,15 @@ public sealed class ExternalAccessManager : IDisposable
 
     public void Dispose()
     {
-        DisableAsync().GetAwaiter().GetResult();
+        // Avoid sync-over-async on the UI / finalizer thread (deadlock risk).
+        // Fire-and-forget shutdown; the WebApplication's hosted services will be
+        // torn down in the background. Process exit will reclaim any sockets.
+        if (!IsEnabled) return;
+        _ = Task.Run(async () =>
+        {
+            try { await DisableAsync(); }
+            catch (Exception ex) { _logger.LogWarning(ex, "Background dispose of external listener failed"); }
+        });
     }
 
     /// <summary>Generates a cryptographically random 32-character hex token.</summary>

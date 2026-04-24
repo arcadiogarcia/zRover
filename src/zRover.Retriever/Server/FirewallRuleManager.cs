@@ -16,6 +16,12 @@ internal static class FirewallRuleManager
 {
     private const string RuleName = "zRover.Retriever.External";
 
+    // Once we observe (or create) the rule in this process, skip the PowerShell
+    // probe on subsequent toggles. The rule is created by us and only changes
+    // out-of-band if the user/admin manually deletes it, which is rare enough
+    // that requiring a process restart to redetect is acceptable.
+    private static int s_ruleConfirmed;
+
     /// <summary>
     /// Adds an inbound TCP allow rule for <paramref name="port"/> if one with the
     /// expected name does not already exist. Silently succeeds if the rule is
@@ -23,6 +29,12 @@ internal static class FirewallRuleManager
     /// </summary>
     public static Task EnsureInboundRuleAsync(int port, ILogger logger, CancellationToken ct = default)
     {
+        if (Interlocked.CompareExchange(ref s_ruleConfirmed, 0, 0) == 1)
+        {
+            logger.LogDebug("Firewall rule '{Rule}' already confirmed this session \u2014 skipping probe", RuleName);
+            return Task.CompletedTask;
+        }
+
         // Run the entire check+create flow on a background thread. The rule
         // existence probe launches PowerShell which can take a second or two
         // to spin up .NET + the NetSecurity module; doing that on the UI
@@ -32,6 +44,7 @@ internal static class FirewallRuleManager
             if (RuleExists())
             {
                 logger.LogDebug("Firewall rule '{Rule}' already exists \u2014 skipping creation", RuleName);
+                Interlocked.Exchange(ref s_ruleConfirmed, 1);
                 return;
             }
 
@@ -64,6 +77,7 @@ internal static class FirewallRuleManager
                     if (proc.ExitCode == 0)
                     {
                         logger.LogInformation("Firewall rule '{Rule}' created successfully", RuleName);
+                        Interlocked.Exchange(ref s_ruleConfirmed, 1);
                         return;
                     }
                     logger.LogWarning(

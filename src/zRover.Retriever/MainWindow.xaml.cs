@@ -144,6 +144,10 @@ public sealed partial class MainWindow : Window
 
     private void OnClosed(object sender, WindowEventArgs args)
     {
+        // In mock mode (#if DEBUG, ZROVER_MOCK_UI=1) the service fields are null,
+        // so we never subscribed to their events — skip the unhook.
+        if (_registry is null) return;
+
         _registry.SessionsChanged -= OnSessionsChanged;
         _registry.ActiveSessionChanged -= OnActiveSessionChanged;
         _managers.ManagersChanged -= OnManagersChanged;
@@ -485,44 +489,77 @@ public sealed partial class MainWindow : Window
 
     private async void OnExternalToggled(object sender, RoutedEventArgs e)
     {
-        if (ExternalToggle.IsOn)
+        try
         {
-            // Show the loading panel immediately so the user sees feedback
-            // while the listener and firewall rule are being set up.
-            ExternalLoadingPanel.Visibility = Visibility.Visible;
-            ExternalInfoPanel.Visibility = Visibility.Collapsed;
-            await _external.EnableAsync();
+            if (ExternalToggle.IsOn)
+            {
+                // Show the loading panel immediately so the user sees feedback
+                // while the listener and firewall rule are being set up.
+                ExternalLoadingPanel.Visibility = Visibility.Visible;
+                ExternalInfoPanel.Visibility = Visibility.Collapsed;
+                await _external.EnableAsync();
+            }
+            else
+            {
+                await _external.DisableAsync();
+            }
         }
-        else
+        catch (Exception ex)
         {
-            await _external.DisableAsync();
+            // Never let an exception escape an async void handler — it would
+            // tear down the UI thread. Snap the toggle back to a safe state
+            // and log; future iterations can surface a Toast.
+            System.Diagnostics.Debug.WriteLine($"OnExternalToggled failed: {ex}");
+            ExternalLoadingPanel.Visibility = Visibility.Collapsed;
+            ExternalInfoPanel.Visibility = Visibility.Collapsed;
         }
     }
 
     private async void OnPackageInstallToggled(object sender, RoutedEventArgs e)
     {
-        if (PackageInstallToggle.IsOn)
-            await _packageInstall.EnableAsync();
-        else
-            _packageInstall.Disable();
+        try
+        {
+            if (PackageInstallToggle.IsOn)
+                await _packageInstall.EnableAsync();
+            else
+                _packageInstall.Disable();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"OnPackageInstallToggled failed: {ex}");
+        }
     }
 
     private void OnCopyLocalUrlClicked(object sender, RoutedEventArgs e)
     {
-        var url = _config["Urls"] ?? "http://localhost:5200";
-        var dp = new DataPackage();
-        dp.SetText(url);
-        Clipboard.SetContent(dp);
+        try
+        {
+            var url = _config["Urls"] ?? "http://localhost:5200";
+            var dp = new DataPackage();
+            dp.SetText(url);
+            Clipboard.SetContent(dp);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Copy local URL failed: {ex}");
+        }
     }
 
     private void OnCopyLinkClicked(object sender, RoutedEventArgs e)
     {
-        var link = _external.GetConnectionLink();
-        if (link == null) return;
+        try
+        {
+            var link = _external.GetConnectionLink();
+            if (link == null) return;
 
-        var dp = new DataPackage();
-        dp.SetText(link);
-        Clipboard.SetContent(dp);
+            var dp = new DataPackage();
+            dp.SetText(link);
+            Clipboard.SetContent(dp);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Copy link failed: {ex}");
+        }
     }
 
     private async void OnReconnectManagerClicked(object sender, RoutedEventArgs e)
@@ -532,7 +569,11 @@ public sealed partial class MainWindow : Window
 
         btn.IsEnabled = false;
         try { await _managers.ConnectAsync(vm.McpUrl, vm.BearerToken, vm.Alias); }
-        catch { /* connection failed — stays in past list */ }
+        catch (Exception ex)
+        {
+            // connection failed — stays in past list
+            System.Diagnostics.Debug.WriteLine($"OnReconnectManagerClicked failed: {ex}");
+        }
         finally { btn.IsEnabled = true; }
     }
 
@@ -550,8 +591,15 @@ public sealed partial class MainWindow : Window
 
     private async void OnDisconnectManagerClicked(object sender, RoutedEventArgs e)
     {
-        if (sender is Microsoft.UI.Xaml.Controls.Button btn && btn.Tag is string managerId)
-            await _managers.DisconnectAsync(managerId);
+        try
+        {
+            if (sender is Microsoft.UI.Xaml.Controls.Button btn && btn.Tag is string managerId)
+                await _managers.DisconnectAsync(managerId);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"OnDisconnectManagerClicked failed: {ex}");
+        }
     }
 }
 

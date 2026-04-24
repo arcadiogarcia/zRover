@@ -2,10 +2,11 @@
 # Builds, signs, and installs zRover.Retriever as a proper MSIX package.
 # Requires: Windows SDK (signtool.exe) or microsoft.windows.sdk.buildtools NuGet package.
 #
-# Usage (local dev):
+# Usage (local dev — no UAC, current user only):
 #   .\deploy-dev.ps1              # x64 Debug (default)
 #   .\deploy-dev.ps1 -Arch arm64
 #   .\deploy-dev.ps1 -Config Release
+#   .\deploy-dev.ps1 -AllUsers    # provision for every user (requires elevation)
 #
 # Usage (CI / GitHub Actions — skips trust UAC and Add-AppxProvisionedPackage):
 #   .\deploy-dev.ps1 -Config Release -SkipInstall
@@ -16,7 +17,8 @@ param(
     [string] $Arch        = 'x64',
     [ValidateSet('Debug','Release')]
     [string] $Config      = 'Debug',
-    [switch] $SkipInstall           # CI: skip UAC trust + provisioning
+    [switch] $SkipInstall,          # CI: skip UAC trust + provisioning
+    [switch] $AllUsers              # provision for all users (requires elevation); default is current-user only
 )
 
 $ErrorActionPreference = 'Stop'
@@ -241,25 +243,43 @@ if (-not $trusted) {
 }
 
 # ── 11. Remove any previously installed version ───────────────────────────────
-Get-AppxProvisionedPackage -Online |
-    Where-Object { $_.DisplayName -eq 'zRover.Retriever' } |
-    ForEach-Object {
-        Write-Host "Removing provisioned: $($_.PackageName)"
-        Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName
+if ($AllUsers) {
+    Get-AppxProvisionedPackage -Online |
+        Where-Object { $_.DisplayName -eq 'zRover.Retriever' } |
+        ForEach-Object {
+            Write-Host "Removing provisioned: $($_.PackageName)"
+            Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName
+        }
+    $existing = Get-AppxPackage -AllUsers | Where-Object { $_.Name -eq 'zRover.Retriever' }
+    if ($existing) {
+        Write-Host "Removing previous (all users): $($existing.PackageFullName)"
+        Remove-AppxPackage $existing.PackageFullName -AllUsers
     }
-$existing = Get-AppxPackage -AllUsers | Where-Object { $_.Name -eq 'zRover.Retriever' }
-if ($existing) {
-    Write-Host "Removing previous: $($existing.PackageFullName)"
-    Remove-AppxPackage $existing.PackageFullName -AllUsers
+} else {
+    $existing = Get-AppxPackage -Name 'zRover.Retriever' -ErrorAction SilentlyContinue
+    if ($existing) {
+        Write-Host "Removing previous (current user): $($existing.PackageFullName)"
+        Remove-AppxPackage $existing.PackageFullName
+    }
 }
 
-# ── 12. Install (all users) ──────────────────────────────────────────────────
-Write-Host "Installing $MsixPath (all users)..."
-Add-AppxProvisionedPackage -Online -PackagePath $MsixPath -SkipLicense
+# ── 12. Install ──────────────────────────────────────────────────────────────
+if ($AllUsers) {
+    Write-Host "Installing $MsixPath (all users — requires elevation)..."
+    Add-AppxProvisionedPackage -Online -PackagePath $MsixPath -SkipLicense
 
-Write-Host ''
-Write-Host 'Done. Package provisioned for all users:'
-Get-AppxPackage -AllUsers | Where-Object { $_.Name -eq 'zRover.Retriever' } |
-    Select-Object Name, Version, PackageFullName | Format-List
+    Write-Host ''
+    Write-Host 'Done. Package provisioned for all users:'
+    Get-AppxPackage -AllUsers | Where-Object { $_.Name -eq 'zRover.Retriever' } |
+        Select-Object Name, Version, PackageFullName | Format-List
+} else {
+    Write-Host "Installing $MsixPath (current user, no elevation)..."
+    Add-AppxPackage -Path $MsixPath -ForceApplicationShutdown
+
+    Write-Host ''
+    Write-Host 'Done. Package installed for current user:'
+    Get-AppxPackage -Name 'zRover.Retriever' |
+        Select-Object Name, Version, PackageFullName | Format-List
+}
 
 Write-Host 'Startup task will appear in Task Manager > Startup apps after next login.'

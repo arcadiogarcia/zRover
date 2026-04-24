@@ -4,24 +4,33 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Windows.ApplicationModel;
+using Windows.Services.Store;
 using zRover.Core;
 using zRover.Retriever.Sessions;
 
 namespace zRover.Retriever.Server;
 
 /// <summary>
-/// Registers the <c>update_retriever</c> MCP tool, which fetches the latest
-/// release from GitHub, downloads the MSIX, installs it via PowerShell
-/// (which force-closes all running instances), and relaunches the app.
+/// Registers the <c>update_retriever</c> MCP tool. Two completely separate code
+/// paths run depending on how the app was installed:
+///
+/// <list type="bullet">
+///   <item><b>Store install</b> (<c>PackageSignatureKind.Store</c>): use
+///         <see cref="StoreContext"/> to query for updates from the Microsoft
+///         Store and download+install them silently via
+///         <see cref="StoreContext.TrySilentDownloadAndInstallStorePackageUpdatesAsync"/>.
+///         The Store handles all signing, identity, and trust.</item>
+///   <item><b>Developer / sideload install</b> (any other signature kind):
+///         fall back to the original GitHub release flow — query the GitHub
+///         API, download the per-arch MSIX, and Add-AppxPackage it via a
+///         detached PowerShell helper that ForceApplicationShutdowns us.</item>
+/// </list>
+///
+/// The result JSON always includes an <c>updateChannel</c> field
+/// (<c>"store"</c> or <c>"github"</c>) so callers can tell which path ran.
 ///
 /// Supports federation: pass a <c>deviceId</c> to update any device reachable
 /// via the remote-manager chain, including multi-hop paths ("a1b2:c3d4").
-///
-/// Prerequisites (satisfied by the normal first-run install):
-/// <list type="bullet">
-///   <item>The release signing certificate is already trusted in
-///         <c>Cert:\LocalMachine\TrustedPeople</c>.</item>
-/// </list>
 /// </summary>
 public static class SelfUpdateTools
 {
@@ -41,13 +50,13 @@ public static class SelfUpdateTools
     {
         registry.RegisterTool(
             "update_retriever",
-            "Checks GitHub for the latest zRover Retriever release and, if a newer version is " +
-            "available, downloads and installs it on the target device then restarts its Retriever. " +
-            "Supports federation: pass a deviceId (from list_devices) to update a remote device, " +
-            "including multi-hop paths (e.g. 'a1b2:c3d4'). Omit deviceId to update the local machine. " +
-            "The signing certificate must already be trusted on the target machine. " +
-            "Returns immediately with the update status; the Retriever process will exit and " +
-            "relaunch automatically within a few seconds.",
+            "Updates the zRover Retriever to the latest version. The update channel is chosen " +
+            "automatically based on how the app was installed: Store installs are updated through " +
+            "the Microsoft Store APIs (silent download + install); developer / sideloaded installs " +
+            "download the matching MSIX from the latest GitHub release. Supports federation: pass " +
+            "a deviceId (from list_devices) to update a remote device, including multi-hop paths " +
+            "(e.g. 'a1b2:c3d4'). Omit deviceId to update the local machine. The result includes an " +
+            "`updateChannel` field ('store' or 'github') indicating which path was taken.",
             """
             {
               "type": "object",
@@ -78,7 +87,7 @@ public static class SelfUpdateTools
                     }
                 }
 
-                // ── 1. Read current installed version ─────────────────────────────────
+                // ── 1. Read current installed version + branch on install source ────
                 var currentPkg    = Package.Current;
                 var currentPkgVer = currentPkg.Id.Version;
                 var currentVer    = new Version(
@@ -86,8 +95,18 @@ public static class SelfUpdateTools
                     currentPkgVer.Build, currentPkgVer.Revision);
                 var familyName    = currentPkg.Id.FamilyName;
                 var aumid         = $"{familyName}!App";
+                var sigKind       = currentPkg.SignatureKind;
 
-                logger.LogInformation("Self-update check: current version {Version}", currentVer);
+                logger.LogInformation(
+                    "Self-update check: current version {Version}, signatureKind {SignatureKind}",
+                    currentVer, sigKind);
+
+                if (sigKind == PackageSignatureKind.Store)
+                {
+                    return await UpdateViaStoreAsync(currentVer, logger);
+                }
+
+                // ── GitHub fallback path (developer / sideload installs) ──────────────
 
                 // ── 2. Fetch latest GitHub release ─────────────────────────────────────
                 GitHubRelease release;
@@ -104,9 +123,10 @@ public static class SelfUpdateTools
                     logger.LogError(ex, "Failed to fetch latest release from GitHub");
                     return JsonSerializer.Serialize(new
                     {
-                        success = false,
-                        error   = "GITHUB_API_FAILED",
-                        message = $"Could not reach GitHub releases API: {ex.Message}",
+                        success       = false,
+                        updateChannel = "github",
+                        error         = "GITHUB_API_FAILED",
+                        message       = $"Could not reach GitHub releases API: {ex.Message}",
                     });
                 }
 
@@ -117,9 +137,10 @@ public static class SelfUpdateTools
                 {
                     return JsonSerializer.Serialize(new
                     {
-                        success = false,
-                        error   = "INVALID_RELEASE_VERSION",
-                        message = $"Could not parse version from tag '{tagName}'.",
+                        success       = false,
+                        updateChannel = "github",
+                        error         = "INVALID_RELEASE_VERSION",
+                        message       = $"Could not parse version from tag '{tagName}'.",
                     });
                 }
 
@@ -131,6 +152,7 @@ public static class SelfUpdateTools
                     return JsonSerializer.Serialize(new
                     {
                         success        = true,
+                        updateChannel  = "github",
                         alreadyCurrent = true,
                         message        = $"Already on the latest version ({currentVer}).",
                         currentVersion = currentVer.ToString(),
@@ -155,11 +177,12 @@ public static class SelfUpdateTools
                 {
                     return JsonSerializer.Serialize(new
                     {
-                        success = false,
-                        error   = "ASSET_NOT_FOUND",
-                        message = $"No MSIX asset found in release '{tagName}'. " +
-                                  $"Expected '{assetName}'. " +
-                                  $"Available assets: {string.Join(", ", release.Assets?.Select(a => a.Name) ?? [])}",
+                        success       = false,
+                        updateChannel = "github",
+                        error         = "ASSET_NOT_FOUND",
+                        message       = $"No MSIX asset found in release '{tagName}'. " +
+                                        $"Expected '{assetName}'. " +
+                                        $"Available assets: {string.Join(", ", release.Assets?.Select(a => a.Name) ?? [])}",
                     });
                 }
 
@@ -184,9 +207,10 @@ public static class SelfUpdateTools
                     logger.LogError(ex, "Failed to download MSIX from {Url}", asset.BrowserDownloadUrl);
                     return JsonSerializer.Serialize(new
                     {
-                        success = false,
-                        error   = "DOWNLOAD_FAILED",
-                        message = $"Failed to download MSIX: {ex.Message}",
+                        success       = false,
+                        updateChannel = "github",
+                        error         = "DOWNLOAD_FAILED",
+                        message       = $"Failed to download MSIX: {ex.Message}",
                     });
                 }
 
@@ -233,6 +257,7 @@ public static class SelfUpdateTools
                 return JsonSerializer.Serialize(new
                 {
                     success        = true,
+                    updateChannel  = "github",
                     alreadyCurrent = false,
                     message        = $"Update from v{currentVer} to v{latestVer} in progress. The Retriever will close and relaunch automatically.",
                     currentVersion = currentVer.ToString(),
@@ -240,6 +265,111 @@ public static class SelfUpdateTools
                     assetName      = asset.Name,
                 }, JsonOpts);
             });
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  Store update path
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private static async Task<string> UpdateViaStoreAsync(Version currentVer, ILogger logger)
+    {
+        StoreContext context;
+        try
+        {
+            context = StoreContext.GetDefault();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to obtain StoreContext");
+            return JsonSerializer.Serialize(new
+            {
+                success        = false,
+                updateChannel  = "store",
+                error          = "STORE_CONTEXT_UNAVAILABLE",
+                message        = $"Could not obtain Microsoft Store context: {ex.Message}",
+                currentVersion = currentVer.ToString(),
+            }, JsonOpts);
+        }
+
+        // Step 1: ask the Store for available updates.
+        IReadOnlyList<StorePackageUpdate> updates;
+        try
+        {
+            updates = await context.GetAppAndOptionalStorePackageUpdatesAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Store update check failed");
+            return JsonSerializer.Serialize(new
+            {
+                success        = false,
+                updateChannel  = "store",
+                error          = "STORE_CHECK_FAILED",
+                message        = $"Could not query Microsoft Store for updates: {ex.Message}",
+                currentVersion = currentVer.ToString(),
+            }, JsonOpts);
+        }
+
+        if (updates.Count == 0)
+        {
+            logger.LogInformation("Store reports no updates available");
+            return JsonSerializer.Serialize(new
+            {
+                success        = true,
+                updateChannel  = "store",
+                alreadyCurrent = true,
+                message        = $"Already on the latest version ({currentVer}) according to the Microsoft Store.",
+                currentVersion = currentVer.ToString(),
+            }, JsonOpts);
+        }
+
+        logger.LogInformation(
+            "Store reports {Count} update(s) available; starting silent download + install",
+            updates.Count);
+
+        // Step 2: silent download + install. Runs without UI — appropriate for an
+        // MCP-triggered action. The OS handles closing/relaunching as needed.
+        StorePackageUpdateResult installResult;
+        try
+        {
+            installResult = await context
+                .TrySilentDownloadAndInstallStorePackageUpdatesAsync(updates);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Store silent install failed");
+            return JsonSerializer.Serialize(new
+            {
+                success        = false,
+                updateChannel  = "store",
+                error          = "STORE_INSTALL_FAILED",
+                message        = $"Microsoft Store install failed: {ex.Message}",
+                currentVersion = currentVer.ToString(),
+            }, JsonOpts);
+        }
+
+        var ok = installResult.OverallState == StorePackageUpdateState.Completed;
+        return JsonSerializer.Serialize(new
+        {
+            success        = ok,
+            updateChannel  = "store",
+            alreadyCurrent = false,
+            overallState   = installResult.OverallState.ToString(),
+            message        = ok
+                ? $"Microsoft Store queued {updates.Count} update(s). The app will close and relaunch automatically."
+                : $"Microsoft Store update did not complete (state: {installResult.OverallState}). The user may need to confirm via the Store app.",
+            currentVersion = currentVer.ToString(),
+            pendingPackages = updates.Select(u => new
+            {
+                packageFamilyName = u.Package?.Id?.FamilyName,
+                version           = u.Package is null ? null : new Version(
+                    u.Package.Id.Version.Major,
+                    u.Package.Id.Version.Minor,
+                    u.Package.Id.Version.Build,
+                    u.Package.Id.Version.Revision).ToString(),
+                mandatory = u.Mandatory,
+            }).ToArray(),
+        }, JsonOpts);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
